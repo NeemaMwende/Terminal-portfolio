@@ -14,15 +14,15 @@ class AITerminalEngine:
         
         # Define user resume data
         self.resume_data = {
-            "name": "Mark Gatere",
+            "name": "Neema Mwende",
             "title": "Software & AI Engineer",
             "bio": "Passionate about building intelligent systems and modern web apps.",
-            "about": "I'm Mark Gatere, passionate about building intelligent systems and modern web apps.",
+            "about": "I'm Neema Mwende, passionate about building intelligent systems and modern web apps.",
             "contact": {
-                "email": "markgatere@example.com",
-                "github": "github.com/markgatere",
-                "linkedin": "linkedin.com/in/markgatere",
-                "twitter": "@markgatere"
+                "email": "neemamwende009@gmail.com",
+                "github": "github.com/neemamwende",
+                "linkedin": "linkedin.com/in/neemamwende",
+                "twitter": "@gracepete"
             },
             "skills": {
                 "programming": ["Python", "JavaScript", "Java", "C++"],
