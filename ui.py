@@ -4,21 +4,24 @@ from datetime import datetime
 import os
 from ai_engine import AITerminalEngine
 from dotenv import load_dotenv
+
 load_dotenv()
 
 st.set_page_config(page_title="My Terminal", layout="wide")
 
-# Initialize AI engine with Gemini API key
-@st.cache_resource
+# Initialize AI engine with Gemini API key (without caching to avoid conflicts)
 def get_ai_engine():
     api_key = os.getenv("GEMINI_API_KEY")
-  
     if not api_key:
         st.error("GEMINI_API_KEY environment variable not set")
         return None
     return AITerminalEngine(api_key=api_key)
 
-ai_engine = get_ai_engine()
+# Create AI engine instance
+if "ai_engine" not in st.session_state:
+    st.session_state.ai_engine = get_ai_engine()
+
+ai_engine = st.session_state.ai_engine
 
 # --- CSS Styles ---
 st.markdown("""
@@ -31,6 +34,7 @@ body {
 .main { background-color: black; padding: 0; }
 .stApp { background-color: black; }
 .stTextInput { display: none !important; }
+.stTextInput > div { display: none !important; }
 .header {
     color: #00ff99;
     border-bottom: 1px solid #00ff99;
@@ -144,10 +148,10 @@ AI Developer at StartupXYZ (2020-2022)
 
 Research Assistant at University Lab (2019-2020)
 - Computer Vision research""",
-    "contact": """Email: markgatere@example.com
-GitHub: github.com/markgatere
-LinkedIn: linkedin.com/in/markgatere
-Twitter: @markgatere""",
+    "contact": """Email: neema@example.com
+GitHub: github.com/neema
+LinkedIn: linkedin.com/in/neema
+Twitter: @neema""",
     "education": """BSc in Software Engineering - Strathmore University (2020)
 Advanced Machine Learning Certificate - Coursera
 Full Stack Development Bootcamp - TechAcademy""",
@@ -166,8 +170,6 @@ if "history" not in st.session_state:
     st.session_state.history = [("neema@portfolio:~$ ", "welcome", commands["welcome"], False)]
 if "temp_command" not in st.session_state:
     st.session_state.temp_command = ""
-if "use_ai" not in st.session_state:
-    st.session_state.use_ai = True
 
 # --- Header bar ---
 st.markdown(
@@ -186,9 +188,8 @@ def render_terminal():
             output_class = "ai-output" if is_ai else "output"
             html += f'<div class="{output_class}">{output}</div>'
     html += '<div class="input-line">'
-    html += '<span class="prompt">gatere@portfolio:~$ </span>'
+    html += '<span class="prompt">neema@portfolio:~$ </span>'
     html += '<span id="typed-text" class="command"></span>'
-    html += '<span id="suggestion" class="suggestion"></span>'
     html += '<span class="cursor"></span>'
     html += '</div>'
     html += '</div>'
@@ -197,52 +198,52 @@ def render_terminal():
 render_terminal()
 
 # --- Hidden input field ---
-command_input = st.text_input("terminal_input", key="terminal_input", label_visibility="collapsed")
+command_input = st.text_input("", key="terminal_input", label_visibility="collapsed")
 
-# --- JS Typing System with AI Suggestions ---
+# --- JS Typing System (Fixed) ---
 st.markdown("""
 <script>
 (function() {
-  window._typed = window._typed || '';
-  window._suggestion = '';
+  window.terminalState = window.terminalState || {
+    typed: '',
+    attached: false
+  };
   
   function updateDisplay() {
     const typedText = document.querySelector('#typed-text');
     const terminal = document.querySelector('#terminal');
-    const suggestion = document.querySelector('#suggestion');
     
-    if (typedText) typedText.textContent = window._typed;
-    if (suggestion) suggestion.textContent = window._suggestion;
-    if (terminal) terminal.scrollTop = terminal.scrollHeight;
+    if (typedText) {
+      typedText.textContent = window.terminalState.typed;
+    }
+    if (terminal) {
+      terminal.scrollTop = terminal.scrollHeight;
+    }
   }
   
   function handleKey(e) {
+    const hiddenInput = document.querySelector('input[data-testid="stTextInput"]');
+    
     if (e.key === 'Enter') {
-      const hiddenInput = document.querySelector('input[data-testid="stTextInput"]');
-      if (hiddenInput && window._typed.trim() !== '') {
-        hiddenInput.value = window._typed;
+      if (hiddenInput && window.terminalState.typed.trim() !== '') {
+        hiddenInput.value = window.terminalState.typed;
         hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
         hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
       }
-      window._typed = '';
-      window._suggestion = '';
+      window.terminalState.typed = '';
     } else if (e.key === 'Backspace') {
       e.preventDefault();
-      window._typed = window._typed.slice(0, -1);
-      window._suggestion = '';
+      window.terminalState.typed = window.terminalState.typed.slice(0, -1);
     } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      window._typed += e.key;
+      window.terminalState.typed += e.key;
     }
     updateDisplay();
   }
   
-  if (!window._terminalKeyHandlerAttached) {
-    document.addEventListener('keydown', handleKey);
-    window._terminalKeyHandlerAttached = true;
+  if (!window.terminalState.attached) {
+    document.addEventListener('keydown', handleKey, true);
+    window.terminalState.attached = true;
   }
-  
-  const observer = new MutationObserver(updateDisplay);
-  observer.observe(document.body, { childList: true, subtree: true });
   
   updateDisplay();
 })();
