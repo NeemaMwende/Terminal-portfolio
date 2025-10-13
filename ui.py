@@ -1,4 +1,3 @@
-# ui.py - Main Streamlit UI with AI integration
 import streamlit as st
 from datetime import datetime
 import os
@@ -9,7 +8,6 @@ load_dotenv()
 
 st.set_page_config(page_title="My Terminal", layout="wide")
 
-# Initialize AI engine with Gemini API key (without caching to avoid conflicts)
 def get_ai_engine():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
