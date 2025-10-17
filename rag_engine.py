@@ -18,8 +18,8 @@ class RAGEngine:
         
         # Initialize OpenAI embeddings (Fixed: use api_key instead of openai_api_key)
         self.embeddings = OpenAIEmbeddings(
-            api_key=openai_api_key,
-            model="text-embedding-3-small"
+            # api_key=openai_api_key,
+            # model="text-embedding-3-small"
         )
         
         # Initialize ChromaDB client
