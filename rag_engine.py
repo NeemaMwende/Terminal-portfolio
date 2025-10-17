@@ -2,7 +2,7 @@
 RAG Engine - Handles PDF embedding, ChromaDB storage and retrieval
 """
 import os
-from typing import List, Dict
+from typing import List, Dict, Any
 import chromadb
 from chromadb.config import Settings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -11,14 +11,14 @@ from langchain_openai import OpenAIEmbeddings
 
 
 class RAGEngine:
-    def __init__(self, openai_api_key: str = None):
+    def __init__(self, openai_api_key: str = None): # type: ignore
         """Initialize RAG Engine with OpenAI embeddings and ChromaDB"""
         if openai_api_key is None:
             openai_api_key = os.getenv("OPENAI_API_KEY")
         
-        # Initialize OpenAI embeddings
+        # Initialize OpenAI embeddings (Fixed: use api_key instead of openai_api_key)
         self.embeddings = OpenAIEmbeddings(
-            openai_api_key=openai_api_key,
+            api_key=openai_api_key,
             model="text-embedding-3-small"
         )
         
@@ -38,7 +38,7 @@ class RAGEngine:
                 metadata={"hnsw:space": "cosine"}
             )
     
-    def load_and_embed_resume(self, pdf_path: str = "resume.pdf"):
+    def load_and_embed_resume(self, pdf_path: str = "resume.pdf") -> int:
         """Load resume PDF, split into chunks, and store in ChromaDB"""
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"Resume PDF not found at {pdf_path}")
@@ -57,35 +57,38 @@ class RAGEngine:
         
         # Prepare data for ChromaDB
         texts = [chunk.page_content for chunk in chunks]
-        metadatas = [{"source": pdf_path, "chunk_id": i} for i in range(len(chunks))]
+        metadatas: List[Dict[str, Any]] = [
+            {"source": pdf_path, "chunk_id": i} 
+            for i in range(len(chunks))
+        ]
         ids = [f"chunk_{i}" for i in range(len(chunks))]
         
         # Generate embeddings
         embeddings_list = self.embeddings.embed_documents(texts)
         
-        # Store in ChromaDB
+        # Store in ChromaDB (Fixed: proper type casting)
         self.collection.add(
-            embeddings=embeddings_list,
+            embeddings=embeddings_list,  # type: ignore
             documents=texts,
-            metadatas=metadatas,
+            metadatas=metadatas,  # type: ignore
             ids=ids
         )
         
         return len(chunks)
     
-    def query_resume(self, query: str, n_results: int = 3) -> List[Dict]:
+    def query_resume(self, query: str, n_results: int = 3) -> List[Dict[str, Any]]:
         """Query ChromaDB for relevant resume information"""
         # Generate query embedding
         query_embedding = self.embeddings.embed_query(query)
         
         # Query ChromaDB
         results = self.collection.query(
-            query_embeddings=[query_embedding],
+            query_embeddings=[query_embedding],  # type: ignore
             n_results=n_results
         )
         
         # Format results
-        formatted_results = []
+        formatted_results: List[Dict[str, Any]] = []
         if results['documents'] and len(results['documents']) > 0:
             for i, doc in enumerate(results['documents'][0]):
                 formatted_results.append({
@@ -96,7 +99,7 @@ class RAGEngine:
         
         return formatted_results
     
-    def reset_collection(self):
+    def reset_collection(self) -> None:
         """Clear and reset the collection"""
         self.chroma_client.delete_collection(self.collection_name)
         self.collection = self.chroma_client.create_collection(

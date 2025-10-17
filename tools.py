@@ -6,17 +6,16 @@ from rag_engine import RAGEngine
 import google.generativeai as genai
 import os
 
-
 class PortfolioTools:
-    def __init__(self, rag_engine: RAGEngine, gemini_api_key: str = None):
+    def __init__(self, rag_engine: RAGEngine, gemini_api_key: str = None): # type: ignore
         """Initialize portfolio tools with RAG engine and Gemini"""
         self.rag_engine = rag_engine
         
         if gemini_api_key is None:
             gemini_api_key = os.getenv("GEMINI_API_KEY")
         
-        genai.configure(api_key=gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        genai.configure(api_key=gemini_api_key) # type: ignore
+        self.model = genai.GenerativeModel('gemini-2.5-flash-exp') # type: ignore
         
         # Command mappings
         self.command_queries = {

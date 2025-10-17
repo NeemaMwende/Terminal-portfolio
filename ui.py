@@ -1,27 +1,44 @@
+"""
+UI - Streamlit frontend for portfolio terminal
+Maintains original design, connects to MCP server backend
+"""
 import streamlit as st
 from datetime import datetime
-import os
-from ai_engine import AITerminalEngine
-from dotenv import load_dotenv
-
-load_dotenv()
+from mcp_server import MCPServer
+from config import Config
 
 st.set_page_config(page_title="My Terminal", layout="wide")
 
-def get_ai_engine():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        st.error("GEMINI_API_KEY environment variable not set")
+
+def initialize_mcp_server():
+    """Initialize MCP server with error handling"""
+    # Validate config first
+    is_valid, errors = Config.validate()
+    if not is_valid:
+        st.error("Configuration errors:")
+        for error in errors:
+            st.error(f"  • {error}")
         return None
-    return AITerminalEngine(api_key=api_key)
+    
+    # Initialize MCP server
+    server = MCPServer(resume_pdf_path=Config.RESUME_PDF_PATH)
+    
+    with st.spinner("Initializing AI Portfolio Terminal..."):
+        if server.initialize():
+            st.success("✓ Terminal ready!")
+            return server
+        else:
+            st.error("Failed to initialize terminal. Check console for details.")
+            return None
 
-# Create AI engine instance
-if "ai_engine" not in st.session_state:
-    st.session_state.ai_engine = get_ai_engine()
 
-ai_engine = st.session_state.ai_engine
+# Initialize MCP server once
+if "mcp_server" not in st.session_state:
+    st.session_state.mcp_server = initialize_mcp_server()
 
-# --- CSS Styles ---
+mcp_server = st.session_state.mcp_server
+
+# --- CSS Styles (UNCHANGED) ---
 st.markdown("""
 <style>
 body {
@@ -107,75 +124,23 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
-# --- Commands ---
-commands = {
-    "welcome": """Hi, I'm Neema Mwende, a Software & AI Engineer.
-
-Welcome to my interactive 'AI powered' portfolio terminal!
-Type 'help' to see available commands.""",
-    "help": """Available commands:
-
-about           - Learn about me
-projects        - View my projects
-skills          - See my technical skills
-experience      - My work experience
-contact         - How to reach me
-education       - My educational background
-certifications  - View my certifications
-leadership      - Leadership and community involvement
-clear           - Clear the terminal
-
-Type any command to continue..""",
-    "about": "I'm Neema Mwende, passionate about building intelligent systems and modern web apps.",
-    "projects": """AI Portfolio Terminal - Interactive terminal-based portfolio
-MyTech API Dashboard - Real-time data visualization platform
-Trading Bot Platform - Automated trading system
-Data Analysis Tool - Python-based analytics suite""",
-    "skills": """Programming Languages: Python, JavaScript, Java, C++
-Web Development: Streamlit, React, Next.js, FastAPI
-AI/Machine Learning: TensorFlow, PyTorch, Scikit-learn
-Cloud & DevOps: AWS, GCP, Docker, Kubernetes
-Databases: PostgreSQL, MongoDB, Firebase""",
-    "experience": """Software Engineer at Tech Corp (2022-Present)
-- Led development of ML pipeline systems
-- Built scalable microservices
-
-AI Developer at StartupXYZ (2020-2022)
-- Developed NLP models
-- Deployed production AI systems
-
-Research Assistant at University Lab (2019-2020)
-- Computer Vision research""",
-    "contact": """Email: neema@example.com
-GitHub: github.com/neema
-LinkedIn: linkedin.com/in/neema
-Twitter: @neema""",
-    "education": """BSc in Software Engineering - Strathmore University (2020)
-Advanced Machine Learning Certificate - Coursera
-Full Stack Development Bootcamp - TechAcademy""",
-    "certifications": """AWS Certified Developer Associate
-TensorFlow Developer Certificate
-Azure AI Engineer Associate
-Google Cloud Certified Associate Cloud Engineer""",
-    "leadership": """Tech Lead at AI Club - Mentoring 50+ students
-Mentor at Local Developer Community
-Speaker at Tech Meetups
-Open Source Contributor""",
-}
-
 # --- Session state ---
 if "history" not in st.session_state:
-    st.session_state.history = [("neema@portfolio:~$ ", "welcome", commands["welcome"], False)]
+    welcome_response, _ = mcp_server.process_command("welcome") if mcp_server else ("Terminal not initialized", False)
+    st.session_state.history = [
+        (Config.TERMINAL_PROMPT, "welcome", welcome_response, False)
+    ]
+
 if "temp_command" not in st.session_state:
     st.session_state.temp_command = ""
 
-# --- Header bar ---
+# --- Header bar (UNCHANGED) ---
 st.markdown(
     '<div class="header">help | about | projects | skills | experience | contact | education | certifications | leadership | clear</div>',
     unsafe_allow_html=True
 )
 
-# --- Terminal render function ---
+# --- Terminal render function (UNCHANGED) ---
 terminal_container = st.container()
 
 def render_terminal():
@@ -186,7 +151,7 @@ def render_terminal():
             output_class = "ai-output" if is_ai else "output"
             html += f'<div class="{output_class}">{output}</div>'
     html += '<div class="input-line">'
-    html += '<span class="prompt">neema@portfolio:~$ </span>'
+    html += f'<span class="prompt">{Config.TERMINAL_PROMPT}</span>'
     html += '<span id="typed-text" class="command"></span>'
     html += '<span class="cursor"></span>'
     html += '</div>'
@@ -198,7 +163,7 @@ render_terminal()
 # --- Hidden input field ---
 command_input = st.text_input("", key="terminal_input", label_visibility="collapsed")
 
-# --- JS Typing System (Fixed) ---
+# --- JS Typing System (UNCHANGED) ---
 st.markdown("""
 <script>
 (function() {
@@ -248,36 +213,34 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
-# --- Process command ---
+# --- Process command (UPDATED to use MCP server) ---
 if command_input and command_input.strip():
-    cmd = command_input.strip().lower()
+    cmd = command_input.strip()
     
     if cmd != st.session_state.temp_command:
         st.session_state.temp_command = cmd
 
-        if cmd == "clear":
+        if cmd.lower() == "clear":
             st.session_state.history = []
-        elif cmd in commands:
-            st.session_state.history.append(("neema@portfolio:~$ ", cmd, commands[cmd], False))
         else:
-            # Use AI for strict data extraction from resume
-            if ai_engine:
-                ai_response = ""
+            # Process command through MCP server
+            if mcp_server:
                 try:
-                    for chunk in ai_engine.validate_and_extract(cmd):
-                        ai_response += chunk
-                    st.session_state.history.append(("neema@portfolio:~$ ", cmd, ai_response, True))
+                    response, is_ai = mcp_server.process_command(cmd)
+                    st.session_state.history.append(
+                        (Config.TERMINAL_PROMPT, cmd, response, is_ai)
+                    )
                 except Exception as e:
                     st.session_state.history.append(
-                        ("neema@portfolio:~$ ", cmd, f"Error: {str(e)}. Type 'help' for available commands.", False)
+                        (Config.TERMINAL_PROMPT, cmd, f"Error: {str(e)}", False)
                     )
             else:
                 st.session_state.history.append(
-                    ("neema@portfolio:~$ ", cmd, f"Command not found: '{cmd}'. Type 'help' for available commands.", False)
+                    (Config.TERMINAL_PROMPT, cmd, "Terminal not initialized. Please refresh the page.", False)
                 )
 
         st.rerun()
 
-# --- Timestamp ---
+# --- Timestamp (UNCHANGED) ---
 now = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
 st.markdown(f'<div class="timestamp">{now}</div>', unsafe_allow_html=True)
