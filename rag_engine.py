@@ -16,7 +16,6 @@ class RAGEngine:
         if openai_api_key is None:
             openai_api_key = os.getenv("OPENAI_API_KEY")
         
-        # Initialize OpenAI embeddings (Fixed: use api_key instead of openai_api_key)
         self.embeddings = OpenAIEmbeddings(
             # api_key=openai_api_key,
             # model="text-embedding-3-small"
@@ -66,7 +65,7 @@ class RAGEngine:
         # Generate embeddings
         embeddings_list = self.embeddings.embed_documents(texts)
         
-        # Store in ChromaDB (Fixed: proper type casting)
+        # Store in ChromaDB
         self.collection.add(
             embeddings=embeddings_list,  # type: ignore
             documents=texts,
@@ -89,12 +88,12 @@ class RAGEngine:
         
         # Format results
         formatted_results: List[Dict[str, Any]] = []
-        if results['documents'] and len(results['documents']) > 0:
-            for i, doc in enumerate(results['documents'][0]):
+        if results['documents'] and len(results['documents']) > 0: # type: ignore
+            for i, doc in enumerate(results['documents'][0]): # type: ignore
                 formatted_results.append({
                     'content': doc,
-                    'metadata': results['metadatas'][0][i] if results['metadatas'] else {},
-                    'distance': results['distances'][0][i] if results['distances'] else None
+                    'metadata': results['metadatas'][0][i] if results['metadatas'] else {}, # type: ignore
+                    'distance': results['distances'][0][i] if results['distances'] else None # type: ignore
                 })
         
         return formatted_results

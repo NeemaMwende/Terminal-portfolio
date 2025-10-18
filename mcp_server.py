@@ -2,7 +2,7 @@
 MCP Server - Model Context Protocol server for portfolio terminal
 Exposes tools and connects backend to frontend
 """
-from typing import Optional
+from typing import Optional, Tuple
 from rag_engine import RAGEngine
 from tools import PortfolioTools
 import os
@@ -24,11 +24,14 @@ class MCPServer:
             gemini_key = os.getenv("GEMINI_API_KEY")
             
             if not openai_key:
+                print("⚠ Warning: OPENAI_API_KEY not found")
                 raise ValueError("OPENAI_API_KEY not found in environment")
             if not gemini_key:
+                print("⚠ Warning: GEMINI_API_KEY not found")
                 raise ValueError("GEMINI_API_KEY not found in environment")
             
             # Initialize RAG engine
+            print("Initializing RAG engine...")
             self.rag_engine = RAGEngine(openai_api_key=openai_key)
             
             # Check if resume exists
@@ -36,10 +39,12 @@ class MCPServer:
                 raise FileNotFoundError(f"Resume PDF not found at {self.resume_pdf_path}")
             
             # Load and embed resume
+            print(f"Loading resume from {self.resume_pdf_path}...")
             chunk_count = self.rag_engine.load_and_embed_resume(self.resume_pdf_path)
             print(f"✓ Resume loaded and embedded ({chunk_count} chunks)")
             
             # Initialize tools
+            print("Initializing portfolio tools...")
             self.tools = PortfolioTools(self.rag_engine, gemini_api_key=gemini_key)
             print("✓ Portfolio tools initialized")
             
@@ -51,7 +56,7 @@ class MCPServer:
             self.initialized = False
             return False
     
-    def process_command(self, command: str) -> tuple[str, bool]:
+    def process_command(self, command: str) -> Tuple[str, bool]:
         """
         Process a command and return (response, is_ai_generated)
         
@@ -75,13 +80,17 @@ class MCPServer:
         try:
             response = self.tools.handle_command(command)
             
-            # Determine if it's AI-generated (commands other than help/welcome)
-            is_ai = command.lower().strip() not in ["help", "welcome"]
+            # Determine if it's AI-generated
+            # Commands like help/welcome are not AI-generated
+            basic_commands = ["help", "welcome"]
+            is_ai = command.lower().strip() not in basic_commands
             
             return response, is_ai
             
         except Exception as e:
-            return f"Error processing command: {str(e)}", False
+            error_msg = f"Error processing command: {str(e)}"
+            print(error_msg)
+            return error_msg, False
     
     def reset_rag(self) -> bool:
         """Reset RAG engine and reload resume"""
