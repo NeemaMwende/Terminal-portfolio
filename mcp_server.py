@@ -1,6 +1,6 @@
 """
 MCP Server - Model Context Protocol server for portfolio terminal
-Exposes tools and connects backend to frontend
+OPTIMIZED: Fast initialization with caching
 """
 from typing import Optional, Tuple
 from rag_engine import RAGEngine
@@ -17,38 +17,38 @@ class MCPServer:
         self.initialized = False
         
     def initialize(self) -> bool:
-        """Initialize RAG engine and tools"""
+        """Initialize RAG engine and tools - FAST with caching"""
         try:
             # Get API keys
             openai_key = os.getenv("OPENAI_API_KEY")
             gemini_key = os.getenv("GEMINI_API_KEY")
             
             if not openai_key:
-                print("⚠ Warning: OPENAI_API_KEY not found")
                 raise ValueError("OPENAI_API_KEY not found in environment")
             if not gemini_key:
-                print("⚠ Warning: GEMINI_API_KEY not found")
                 raise ValueError("GEMINI_API_KEY not found in environment")
             
-            # Initialize RAG engine
-            print("Initializing RAG engine...")
-            self.rag_engine = RAGEngine(openai_api_key=openai_key)
+            # Initialize RAG engine (fast - uses cached embeddings)
+            self.rag_engine = RAGEngine(
+                openai_api_key=openai_key,
+                persist_directory="./chroma_db"
+            )
             
             # Check if resume exists
             if not os.path.exists(self.resume_pdf_path):
                 raise FileNotFoundError(f"Resume PDF not found at {self.resume_pdf_path}")
             
-            # Load and embed resume
-            print(f"Loading resume from {self.resume_pdf_path}...")
-            chunk_count = self.rag_engine.load_and_embed_resume(self.resume_pdf_path)
-            print(f"✓ Resume loaded and embedded ({chunk_count} chunks)")
+            # Load and embed resume (FAST - only embeds if not cached)
+            chunk_count = self.rag_engine.load_and_embed_resume(
+                self.resume_pdf_path,
+                force_reload=False  # Set to True to force re-embedding
+            )
             
-            # Initialize tools
-            print("Initializing portfolio tools...")
+            # Initialize tools (fast - no heavy operations)
             self.tools = PortfolioTools(self.rag_engine, gemini_api_key=gemini_key)
-            print("✓ Portfolio tools initialized")
             
             self.initialized = True
+            print(f"✓ MCP Server ready ({chunk_count} chunks loaded)")
             return True
             
         except Exception as e:
@@ -81,7 +81,6 @@ class MCPServer:
             response = self.tools.handle_command(command)
             
             # Determine if it's AI-generated
-            # Commands like help/welcome are not AI-generated
             basic_commands = ["help", "welcome"]
             is_ai = command.lower().strip() not in basic_commands
             
@@ -98,8 +97,10 @@ class MCPServer:
             return False
         
         try:
-            self.rag_engine.reset_collection()
-            chunk_count = self.rag_engine.load_and_embed_resume(self.resume_pdf_path)
+            chunk_count = self.rag_engine.load_and_embed_resume(
+                self.resume_pdf_path,
+                force_reload=True
+            )
             print(f"✓ RAG reset and resume reloaded ({chunk_count} chunks)")
             return True
         except Exception as e:
@@ -112,5 +113,6 @@ class MCPServer:
             "initialized": self.initialized,
             "rag_engine_ready": self.rag_engine is not None,
             "tools_ready": self.tools is not None,
-            "resume_exists": os.path.exists(self.resume_pdf_path)
+            "resume_exists": os.path.exists(self.resume_pdf_path),
+            "cached_chunks": self.rag_engine.collection.count() if self.rag_engine else 0
         }

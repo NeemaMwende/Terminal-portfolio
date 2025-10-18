@@ -11,17 +11,23 @@ import json
 
 st.set_page_config(page_title="My Terminal", layout="wide")
 
-# --- Initialize MCP server ---
-if "mcp_server" not in st.session_state:
+# --- Initialize MCP server with caching ---
+@st.cache_resource
+def get_mcp_server():
+    """Initialize and cache MCP server - only runs once"""
     try:
+        print("🚀 Initializing MCP Server...")
         server = MCPServer(resume_pdf_path=Config.RESUME_PDF_PATH)
         success = server.initialize()
-        st.session_state.mcp_server = server if success else None
+        if success:
+            print("✓ MCP Server cached and ready!")
+            return server
+        return None
     except Exception as e:
-        st.session_state.mcp_server = None
-        print("MCP server initialization error:", e)
+        print(f"✗ MCP server initialization error: {e}")
+        return None
 
-mcp_server = st.session_state.mcp_server
+mcp_server = get_mcp_server()
 
 # --- Session State ---
 if "history" not in st.session_state:
@@ -327,7 +333,7 @@ if command_received and isinstance(command_received, str) and command_received.s
         st.session_state.command_count += 1
         
         if cmd.lower() == "clear":
-            # Reset to welcome only
+           
             welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
 
 Welcome to my interactive 'AI powered' portfolio terminal!
