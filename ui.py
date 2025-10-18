@@ -38,7 +38,7 @@ Type 'help' to see available commands.
 
 Type any command to continue..."""
     st.session_state.history = [
-        {"prompt": Config.TERMINAL_PROMPT, "command": "", "output": welcome_text, "is_ai": False}
+        {"prompt": Config.TERMINAL_PROMPT, "command": "welcome", "output": welcome_text, "is_ai": False}
     ]
 
 if "current_input" not in st.session_state:
@@ -333,7 +333,7 @@ if command_received and isinstance(command_received, str) and command_received.s
         st.session_state.command_count += 1
         
         if cmd.lower() == "clear":
-           
+            # Reset to welcome only
             welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
 
 Welcome to my interactive 'AI powered' portfolio terminal!
