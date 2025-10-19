@@ -1,27 +1,53 @@
+"""
+UI - Streamlit frontend for portfolio terminal with typing effects
+"""
+
 import streamlit as st
 from datetime import datetime
-import os
-from ai_engine import AITerminalEngine
-from dotenv import load_dotenv
-
-load_dotenv()
+from mcp_server import MCPServer
+from config import Config
+import streamlit.components.v1 as components
+import json
 
 st.set_page_config(page_title="My Terminal", layout="wide")
 
-def get_ai_engine():
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        st.error("GEMINI_API_KEY environment variable not set")
+# --- Initialize MCP server with caching ---
+@st.cache_resource
+def get_mcp_server():
+    """Initialize and cache MCP server - only runs once"""
+    try:
+        print("🚀 Initializing MCP Server...")
+        server = MCPServer(resume_pdf_path=Config.RESUME_PDF_PATH)
+        success = server.initialize()
+        if success:
+            print("✓ MCP Server cached and ready!")
+            return server
         return None
-    return AITerminalEngine(api_key=api_key)
+    except Exception as e:
+        print(f"✗ MCP server initialization error: {e}")
+        return None
 
-# Create AI engine instance
-if "ai_engine" not in st.session_state:
-    st.session_state.ai_engine = get_ai_engine()
+mcp_server = get_mcp_server()
 
-ai_engine = st.session_state.ai_engine
+# --- Session State ---
+if "history" not in st.session_state:
+    welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
 
-# --- CSS Styles ---
+Welcome to my interactive 'AI powered' portfolio terminal!
+Type 'help' to see available commands.
+
+Type any command to continue..."""
+    st.session_state.history = [
+        {"prompt": Config.TERMINAL_PROMPT, "command": "welcome", "output": welcome_text, "is_ai": False}
+    ]
+
+if "current_input" not in st.session_state:
+    st.session_state.current_input = ""
+
+if "command_count" not in st.session_state:
+    st.session_state.command_count = 0
+
+# --- Page CSS ---
 st.markdown("""
 <style>
 body {
@@ -29,10 +55,13 @@ body {
     margin: 0;
     padding: 0;
 }
-.main { background-color: black; padding: 0; }
-.stApp { background-color: black; }
-.stTextInput { display: none !important; }
-.stTextInput > div { display: none !important; }
+.main { 
+    background-color: black; 
+    padding: 0; 
+}
+.stApp { 
+    background-color: black; 
+}
 .header {
     color: #00ff99;
     border-bottom: 1px solid #00ff99;
@@ -42,242 +71,303 @@ body {
     font-size: 14px;
     background-color: #000;
 }
-.terminal {
-    background-color: #000;
-    color: #fff;
-    font-family: monospace;
-    padding: 20px;
-    border: 1px solid #00ff99;
-    border-radius: 5px;
-    min-height: 70vh;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    outline: none;
-}
-.prompt { 
-    color: #00aaff; 
-    display: inline; 
-    font-weight: bold; 
-}
-.command { 
-    color: #00ff99; 
-    display: inline; 
-}
-.output { 
-    color: #ffffff; 
-    margin-top: 5px; 
-    margin-bottom: 15px; 
-}
-.ai-output {
-    color: #00ff99;
-    margin-top: 5px;
-    margin-bottom: 15px;
-    font-style: italic;
-}
-.suggestion {
-    color: #888888;
-    display: inline;
-    margin-left: 10px;
-    font-style: italic;
-}
-.input-line { 
-    display: flex; 
-    align-items: center;
-    flex-wrap: wrap;
-}
-.cursor {
-    display: inline-block;
-    background-color: #00ff99;
-    width: 10px;
-    height: 18px;
-    animation: blink 1s step-start infinite;
-    vertical-align: text-bottom;
-    margin-left: 2px;
-}
-@keyframes blink { 
-    50% { background-color: transparent; } 
-}
-.timestamp {
-    color: #00ff99;
-    text-align: right;
-    font-size: 12px;
-    margin-top: 20px;
-}
 </style>
 """, unsafe_allow_html=True)
 
-# --- Commands ---
-commands = {
-    "welcome": """Hi, I'm Neema Mwende, a Software & AI Engineer.
-
-Welcome to my interactive 'AI powered' portfolio terminal!
-Type 'help' to see available commands.""",
-    "help": """Available commands:
-
-about           - Learn about me
-projects        - View my projects
-skills          - See my technical skills
-experience      - My work experience
-contact         - How to reach me
-education       - My educational background
-certifications  - View my certifications
-leadership      - Leadership and community involvement
-clear           - Clear the terminal
-
-Type any command to continue..""",
-    "about": "I'm Neema Mwende, passionate about building intelligent systems and modern web apps.",
-    "projects": """AI Portfolio Terminal - Interactive terminal-based portfolio
-MyTech API Dashboard - Real-time data visualization platform
-Trading Bot Platform - Automated trading system
-Data Analysis Tool - Python-based analytics suite""",
-    "skills": """Programming Languages: Python, JavaScript, Java, C++
-Web Development: Streamlit, React, Next.js, FastAPI
-AI/Machine Learning: TensorFlow, PyTorch, Scikit-learn
-Cloud & DevOps: AWS, GCP, Docker, Kubernetes
-Databases: PostgreSQL, MongoDB, Firebase""",
-    "experience": """Software Engineer at Tech Corp (2022-Present)
-- Led development of ML pipeline systems
-- Built scalable microservices
-
-AI Developer at StartupXYZ (2020-2022)
-- Developed NLP models
-- Deployed production AI systems
-
-Research Assistant at University Lab (2019-2020)
-- Computer Vision research""",
-    "contact": """Email: neema@example.com
-GitHub: github.com/neema
-LinkedIn: linkedin.com/in/neema
-Twitter: @neema""",
-    "education": """BSc in Software Engineering - Strathmore University (2020)
-Advanced Machine Learning Certificate - Coursera
-Full Stack Development Bootcamp - TechAcademy""",
-    "certifications": """AWS Certified Developer Associate
-TensorFlow Developer Certificate
-Azure AI Engineer Associate
-Google Cloud Certified Associate Cloud Engineer""",
-    "leadership": """Tech Lead at AI Club - Mentoring 50+ students
-Mentor at Local Developer Community
-Speaker at Tech Meetups
-Open Source Contributor""",
-}
-
-# --- Session state ---
-if "history" not in st.session_state:
-    st.session_state.history = [("neema@portfolio:~$ ", "welcome", commands["welcome"], False)]
-if "temp_command" not in st.session_state:
-    st.session_state.temp_command = ""
-
-# --- Header bar ---
+# --- Header ---
 st.markdown(
-    '<div class="header">help | about | projects | skills | experience | contact | education | certifications | leadership | clear</div>',
+    '<div class="header">help | about | projects | skills | experience | contact | education | certifications | clear</div>',
     unsafe_allow_html=True
 )
 
-# --- Terminal render function ---
-terminal_container = st.container()
-
-def render_terminal():
-    html = '<div class="terminal" id="terminal" tabindex="0">'
-    for prompt, command, output, is_ai in st.session_state.history:
-        html += f'<div><span class="prompt">{prompt}</span><span class="command">{command}</span></div>'
-        if output:
-            output_class = "ai-output" if is_ai else "output"
-            html += f'<div class="{output_class}">{output}</div>'
-    html += '<div class="input-line">'
-    html += '<span class="prompt">neema@portfolio:~$ </span>'
-    html += '<span id="typed-text" class="command"></span>'
-    html += '<span class="cursor"></span>'
-    html += '</div>'
-    html += '</div>'
-    terminal_container.markdown(html, unsafe_allow_html=True)
-
-render_terminal()
-
-# --- Hidden input field ---
-command_input = st.text_input("", key="terminal_input", label_visibility="collapsed")
-
-# --- JS Typing System (Fixed) ---
-st.markdown("""
-<script>
-(function() {
-  window.terminalState = window.terminalState || {
-    typed: '',
-    attached: false
-  };
-  
-  function updateDisplay() {
-    const typedText = document.querySelector('#typed-text');
-    const terminal = document.querySelector('#terminal');
+# --- Create Terminal HTML ---
+def create_terminal_html():
+    # Convert history to JSON for JavaScript
+    history_json = json.dumps(st.session_state.history)
+    command_count = st.session_state.command_count
     
-    if (typedText) {
-      typedText.textContent = window.terminalState.typed;
-    }
-    if (terminal) {
-      terminal.scrollTop = terminal.scrollHeight;
-    }
-  }
-  
-  function handleKey(e) {
-    const hiddenInput = document.querySelector('input[data-testid="stTextInput"]');
+    now = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
     
-    if (e.key === 'Enter') {
-      if (hiddenInput && window.terminalState.typed.trim() !== '') {
-        hiddenInput.value = window.terminalState.typed;
-        hiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
-        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      window.terminalState.typed = '';
-    } else if (e.key === 'Backspace') {
-      e.preventDefault();
-      window.terminalState.typed = window.terminalState.typed.slice(0, -1);
-    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      window.terminalState.typed += e.key;
-    }
-    updateDisplay();
-  }
-  
-  if (!window.terminalState.attached) {
-    document.addEventListener('keydown', handleKey, true);
-    window.terminalState.attached = true;
-  }
-  
-  updateDisplay();
-})();
-</script>
-""", unsafe_allow_html=True)
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            * {{
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }}
+            body {{
+                background-color: #000;
+                font-family: 'Courier New', monospace;
+                color: #fff;
+                overflow: hidden;
+            }}
+            .terminal {{
+                background-color: #000;
+                color: #fff;
+                font-family: 'Courier New', monospace;
+                padding: 20px;
+                border: 1px solid #00ff99;
+                border-radius: 5px;
+                min-height: 500px;
+                max-height: 500px;
+                overflow-y: auto;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                outline: none;
+            }}
+            .prompt {{ 
+                color: #00aaff; 
+                font-weight: bold; 
+            }}
+            .command {{ 
+                color: #00ff99; 
+            }}
+            .output {{ 
+                color: #ffffff; 
+                margin-top: 5px; 
+                margin-bottom: 15px;
+                line-height: 1.5;
+            }}
+            .ai-output {{
+                color: #ffffff;
+                margin-top: 5px;
+                margin-bottom: 15px;
+                line-height: 1.5;
+            }}
+            .input-line {{ 
+                display: flex; 
+                align-items: baseline;
+            }}
+            #typed-text {{
+                color: #00ff99;
+            }}
+            .cursor {{
+                display: inline-block;
+                background-color: #00ff99;
+                width: 8px;
+                height: 16px;
+                animation: blink 1s step-start infinite;
+                margin-left: 2px;
+                vertical-align: baseline;
+            }}
+            @keyframes blink {{ 
+                50% {{ background-color: transparent; }} 
+            }}
+            .timestamp {{
+                color: #00ff99;
+                text-align: right;
+                font-size: 12px;
+                margin-top: 10px;
+                padding-right: 20px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="terminal" id="terminal" tabindex="0">
+            <div id="history-container"></div>
+            <div class="input-line" id="input-line">
+                <span class="prompt">{Config.TERMINAL_PROMPT}</span>
+                <span id="typed-text"></span>
+                <span class="cursor"></span>
+            </div>
+        </div>
+        <div class="timestamp">{now}</div>
+        
+        <script>
+            let currentInput = '';
+            let isTyping = false;
+            let history = {history_json};
+            let displayedCount = 0;
+            let commandCount = {command_count};
+            
+            function escapeHtml(text) {{
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }}
+            
+            function typeText(element, text, speed, callback) {{
+                let index = 0;
+                element.textContent = '';
+                
+                function typeChar() {{
+                    if (index < text.length) {{
+                        element.textContent += text.charAt(index);
+                        index++;
+                        scrollToBottom();
+                        setTimeout(typeChar, speed);
+                    }} else {{
+                        if (callback) callback();
+                    }}
+                }}
+                
+                typeChar();
+            }}
+            
+            function scrollToBottom() {{
+                const terminal = document.getElementById('terminal');
+                if (terminal) {{
+                    terminal.scrollTop = terminal.scrollHeight;
+                }}
+            }}
+            
+            function displayHistory() {{
+                const container = document.getElementById('history-container');
+                
+                if (displayedCount < history.length) {{
+                    const entry = history[displayedCount];
+                    displayedCount++;
+                    
+                    // Create command line
+                    const commandDiv = document.createElement('div');
+                    const promptSpan = document.createElement('span');
+                    promptSpan.className = 'prompt';
+                    promptSpan.textContent = entry.prompt;
+                    
+                    const commandSpan = document.createElement('span');
+                    commandSpan.className = 'command';
+                    commandSpan.textContent = entry.command;
+                    
+                    commandDiv.appendChild(promptSpan);
+                    commandDiv.appendChild(commandSpan);
+                    container.appendChild(commandDiv);
+                    
+                    // Create output
+                    if (entry.output) {{
+                        const outputDiv = document.createElement('div');
+                        outputDiv.className = entry.is_ai ? 'ai-output' : 'output';
+                        container.appendChild(outputDiv);
+                        
+                        isTyping = true;
+                        typeText(outputDiv, entry.output, 10, function() {{
+                            isTyping = false;
+                            displayHistory(); // Continue with next entry
+                        }});
+                    }} else {{
+                        displayHistory(); // Continue immediately if no output
+                    }}
+                }} else {{
+                    // All history displayed, enable input
+                    isTyping = false;
+                    document.getElementById('terminal').focus();
+                }}
+            }}
+            
+            function updateDisplay() {{
+                const typedText = document.getElementById('typed-text');
+                if (typedText) {{
+                    typedText.textContent = currentInput;
+                }}
+                scrollToBottom();
+            }}
+            
+            function sendCommand(cmd) {{
+                window.parent.postMessage({{
+                    type: 'streamlit:setComponentValue',
+                    value: cmd
+                }}, '*');
+            }}
+            
+            // Keyboard handler
+            document.addEventListener('keydown', function(e) {{
+                if (isTyping) {{
+                    e.preventDefault();
+                    return;
+                }}
+                
+                if (e.key === 'Enter') {{
+                    e.preventDefault();
+                    const cmd = currentInput.trim();
+                    if (cmd !== '') {{
+                        sendCommand(cmd);
+                        currentInput = '';
+                        updateDisplay();
+                    }}
+                }} 
+                else if (e.key === 'Backspace') {{
+                    e.preventDefault();
+                    currentInput = currentInput.slice(0, -1);
+                    updateDisplay();
+                }} 
+                else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {{
+                    e.preventDefault();
+                    currentInput += e.key;
+                    updateDisplay();
+                }}
+            }});
+            
+            // Auto-focus
+            const terminal = document.getElementById('terminal');
+            terminal.focus();
+            
+            // Keep focus
+            terminal.addEventListener('blur', function() {{
+                if (!isTyping) {{
+                    setTimeout(() => terminal.focus(), 10);
+                }}
+            }});
+            
+            // Start displaying history with typing effect
+            displayHistory();
+            updateDisplay();
+        </script>
+    </body>
+    </html>
+    """
+    return html
 
-# --- Process command ---
-if command_input and command_input.strip():
-    cmd = command_input.strip().lower()
+# --- Render Terminal ---
+terminal_html = create_terminal_html()
+command_received = components.html(terminal_html, height=650, scrolling=False)
+
+# --- Process Commands ---
+if command_received and isinstance(command_received, str) and command_received.strip():
+    cmd = command_received.strip()
     
-    if cmd != st.session_state.temp_command:
-        st.session_state.temp_command = cmd
+    # Prevent duplicate processing
+    if cmd != st.session_state.current_input:
+        st.session_state.current_input = cmd
+        st.session_state.command_count += 1
+        
+        if cmd.lower() == "clear":
+            # Reset to welcome only
+            welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
 
-        if cmd == "clear":
-            st.session_state.history = []
-        elif cmd in commands:
-            st.session_state.history.append(("neema@portfolio:~$ ", cmd, commands[cmd], False))
+Welcome to my interactive 'AI powered' portfolio terminal!
+Type 'help' to see available commands.
+
+Type any command to continue..."""
+            st.session_state.history = [
+                {"prompt": Config.TERMINAL_PROMPT, "command": "", "output": welcome_text, "is_ai": False}
+            ]
         else:
-            # Use AI for strict data extraction from resume
-            if ai_engine:
-                ai_response = ""
+            if mcp_server and mcp_server.initialized:
                 try:
-                    for chunk in ai_engine.validate_and_extract(cmd):
-                        ai_response += chunk
-                    st.session_state.history.append(("neema@portfolio:~$ ", cmd, ai_response, True))
+                    response, is_ai = mcp_server.process_command(cmd)
+                    st.session_state.history.append({
+                        "prompt": Config.TERMINAL_PROMPT,
+                        "command": cmd,
+                        "output": response,
+                        "is_ai": is_ai
+                    })
                 except Exception as e:
-                    st.session_state.history.append(
-                        ("neema@portfolio:~$ ", cmd, f"Error: {str(e)}. Type 'help' for available commands.", False)
-                    )
+                    st.session_state.history.append({
+                        "prompt": Config.TERMINAL_PROMPT,
+                        "command": cmd,
+                        "output": f"Error: {{str(e)}}",
+                        "is_ai": False
+                    })
             else:
-                st.session_state.history.append(
-                    ("neema@portfolio:~$ ", cmd, f"Command not found: '{cmd}'. Type 'help' for available commands.", False)
-                )
-
+                error_msg = "Terminal not initialized. Please check your API keys and resume.pdf file."
+                st.session_state.history.append({
+                    "prompt": Config.TERMINAL_PROMPT,
+                    "command": cmd,
+                    "output": error_msg,
+                    "is_ai": False
+                })
+        
+        # Rerun to show new output
         st.rerun()
-
-# --- Timestamp ---
-now = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
-st.markdown(f'<div class="timestamp">{now}</div>', unsafe_allow_html=True)
