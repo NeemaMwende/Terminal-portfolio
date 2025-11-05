@@ -211,27 +211,27 @@ st.markdown("""
     }
     
     /* Terminal container - FIXED */
-    .terminal-container {
-        background-color: #000000;
-        border: 2px solid #00ff99;
-        border-radius: 5px;
-        padding: 20px;
-        margin: 20px 30px;
-        font-family: 'Courier New', monospace;
-        min-height: 70vh;
-        max-height: 70vh;
-        overflow-y: auto;
-        color: #ffffff;
-        position: relative;
-    }
+    # .terminal-container {
+    #     background-color: #000000;
+    #     border: 2px solid #00ff99;
+    #     border-radius: 5px;
+    #     padding: 20px;
+    #     margin: 20px 30px;
+    #     font-family: 'Courier New', monospace;
+    #     min-height: 70vh;
+    #     max-height: 70vh;
+    #     overflow-y: auto;
+    #     color: #ffffff;
+    #     position: relative;
+    # }
     
-    /* Prompt styling */
-    .terminal-prompt {
-        color: #00aaff;
-        font-weight: bold;
-        font-family: 'Courier New', monospace;
-        display: inline;
-    }
+    # /* Prompt styling */
+    # .terminal-prompt {
+    #     color: blue;
+    #     font-weight: bold;
+    #     font-family: 'Courier New', monospace;
+    #     display: inline;
+    # }
     
     /* Command styling */
     .terminal-command {
@@ -316,23 +316,23 @@ st.markdown("""
         margin-top: 10px;
     }
     
-    /* Scrollbar styling */
-    .terminal-container::-webkit-scrollbar {
-        width: 10px;
-    }
+    # /* Scrollbar styling */
+    # .terminal-container::-webkit-scrollbar {
+    #     width: 10px;
+    # }
     
-    .terminal-container::-webkit-scrollbar-track {
-        background: #000000;
-    }
+    # .terminal-container::-webkit-scrollbar-track {
+    #     background: #000000;
+    # }
     
-    .terminal-container::-webkit-scrollbar-thumb {
-        background: #00ff99;
-        border-radius: 5px;
-    }
+    # .terminal-container::-webkit-scrollbar-thumb {
+    #     background: #00ff99;
+    #     border-radius: 5px;
+    # }
     
-    .terminal-container::-webkit-scrollbar-thumb:hover {
-        background: #00cc77;
-    }
+    # .terminal-container::-webkit-scrollbar-thumb:hover {
+    #     background: #00cc77;
+    # }
     
     /* Fix for Streamlit columns inside terminal */
     [data-testid="column"] {
@@ -388,63 +388,53 @@ st.markdown(
     '<div class="header">help | about | projects | skills | experience | contact | education | clear</div>',
     unsafe_allow_html=True
 )
-
 # --- Create Terminal Container with all content inside ---
-terminal_html = '<div class="terminal-container">'
+# st.markdown('<div class="terminal-container">', unsafe_allow_html=True)
 
 # Display command history
 for entry in st.session_state.history:
     if entry["command"] != "welcome":
-        terminal_html += f'<div><span class="terminal-prompt">neema@terminal:~$ </span><span class="terminal-command">{entry["command"]}</span></div>'
-    
-    if entry["output"]:
-        # Escape HTML in output
-        output_escaped = entry["output"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        terminal_html += f'<div class="terminal-output">{output_escaped}</div>'
-
-terminal_html += '</div>'
-
-# Display the terminal with history
-st.markdown(terminal_html, unsafe_allow_html=True)
-
-# --- Input Section (separate from terminal container but styled to look inside) ---
-st.markdown('<div style="margin: 0 30px; margin-top: -50px; position: relative; z-index: 10;">', unsafe_allow_html=True)
-
-col1, col2 = st.columns([0.15, 0.85])
-
-with col1:
-    st.markdown('<div class="input-prompt">neema@terminal:~$ </div>', unsafe_allow_html=True)
-
-with col2:
-    # Use a form to handle Enter key properly
-    with st.form(key=f"input_form_{st.session_state.input_key}", clear_on_submit=True):
-        user_input = st.text_input(
-            "command",
-            key=f"user_input_{st.session_state.input_key}",
-            label_visibility="collapsed",
-            placeholder=""
+        st.markdown(
+            f'<div><span class="terminal-prompt">neema@terminal:~$ </span>'
+            f'<span class="terminal-command">{entry["command"]}</span></div>',
+            unsafe_allow_html=True
         )
-        
-        # Hidden submit button (triggered by Enter key)
-        submitted = st.form_submit_button("Submit")
-        
-        if submitted and user_input:
-            # Process the command
-            response = process_command(user_input)
-            
-            # Add to history if not clear command
-            if response is not None:
-                st.session_state.history.append({
-                    "command": user_input,
-                    "output": response,
-                    "timestamp": datetime.now()
-                })
-            
-            # Increment key to reset form
-            st.session_state.input_key += 1
-            st.rerun()
 
-st.markdown('</div>', unsafe_allow_html=True)
+    if entry["output"]:
+        output_escaped = (
+            entry["output"].replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+        st.markdown(f'<div class="terminal-output">{output_escaped}</div>', unsafe_allow_html=True)
+
+# --- Input Section now inside the terminal box ---
+st.markdown('<div class="input-wrapper">', unsafe_allow_html=True)
+st.markdown('<span class="input-prompt">neema@terminal:~$ </span>', unsafe_allow_html=True)
+
+with st.form(key=f"input_form_{st.session_state.input_key}", clear_on_submit=True):
+    user_input = st.text_input(
+        "command",
+        key=f"user_input_{st.session_state.input_key}",
+        label_visibility="collapsed",
+        placeholder=""
+    )
+    submitted = st.form_submit_button("Submit")
+
+    if submitted and user_input:
+        response = process_command(user_input)
+        if response is not None:
+            st.session_state.history.append({
+                "command": user_input,
+                "output": response,
+                "timestamp": datetime.now()
+            })
+        st.session_state.input_key += 1
+        st.rerun()
+
+st.markdown('</div>', unsafe_allow_html=True)  # close input-wrapper
+st.markdown('</div>', unsafe_allow_html=True)  # close terminal-container
+
 
 # --- Timestamp ---
 current_time = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
