@@ -1,24 +1,25 @@
-"""
-UI - Standalone Streamlit terminal interface with typing effects
-Author: Neema Mwende
-"""
+# """
+# UI - Standalone Streamlit terminal interface with typing effects
+# Author: Neema Mwende
+# """
 
-import streamlit as st
-from datetime import datetime
-import time
-
-# Uncomment these when RAG is ready
+# import streamlit as st
+# from datetime import datetime
+# import streamlit.components.v1 as components
+# import json
 # from rag_engine import ResumeRAG
 # import os
 # from dotenv import load_dotenv
+# import time
+
 # load_dotenv()
 
 # RESUME_PATH = "resume.pdf" 
 # GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-st.set_page_config(page_title="Neema Mwende - AI Terminal", layout="wide", initial_sidebar_state="collapsed")
+# st.set_page_config(page_title="AI Terminal", layout="wide")
 
-# --- Initialize RAG Engine (commented out for now) ---
+# # --- Initialize RAG Engine ---
 # @st.cache_resource
 # def load_rag_engine():
 #     """Load RAG engine (cached to avoid reloading)"""
@@ -35,389 +36,343 @@ st.set_page_config(page_title="Neema Mwende - AI Terminal", layout="wide", initi
 #         return None
 
 # rag_engine = load_rag_engine()
-rag_engine = None  # Set to None for standalone mode
 
-# --- Initialize session state ---
-if "history" not in st.session_state:
-    welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
+# # --- Initialize session state ---
+# if "history" not in st.session_state:
+#     welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
 
-Welcome to my interactive terminal!
-Type 'help' to see available commands.
+# Welcome to my interactive terminal!
+# Type 'help' to see available commands.
 
-Type any command to continue..."""
-    st.session_state.history = [
-        {"command": "welcome", "output": welcome_text, "timestamp": datetime.now()}
-    ]
+# Type any command to continue..."""
+#     st.session_state.history = [
+#         {"prompt": "neema@terminal:~$ ", "command": "welcome", "output": welcome_text, "is_ai": False}
+#     ]
 
-if "current_input" not in st.session_state:
-    st.session_state.current_input = ""
+# if "current_input" not in st.session_state:
+#     st.session_state.current_input = ""
 
-if "input_key" not in st.session_state:
-    st.session_state.input_key = 0
+# if "command_count" not in st.session_state:
+#     st.session_state.command_count = 0
 
-# --- Fallback responses (will be replaced by RAG) ---
-FALLBACK_RESPONSES = {
-    "help": """Available commands:
-• about - Learn about me
-• skills - View my technical skills
-• projects - See my projects
-• experience - View my work experience
-• education - See my education background
-• contact - Get my contact information
-• clear - Clear terminal
-• Or ask any question about my background!""",
-    
-    "about": """• I'm Neema Mwende, a passionate Software & AI Engineer based in Nairobi, Kenya
-• I specialize in building intelligent systems using cutting-edge AI technologies
-• My work spans machine learning, NLP, RAG systems, and full-stack development
-• I'm passionate about creating solutions that make real-world impact
-• Skills: Python, AI/ML, LangChain, Streamlit, React, Cloud Computing
-• Interests: AI Research, Open Source, Tech Community Building""",
-    
-    "skills": """Technical Skills:
+# if "processing" not in st.session_state:
+#     st.session_state.processing = False
 
-Programming Languages:
-• Python, JavaScript, SQL
 
-AI/Machine Learning:
-• LangChain, RAG (Retrieval Augmented Generation)
-• Google Gemini, OpenAI APIs
-• Natural Language Processing
-• Vector Databases (ChromaDB)
+# # --- Custom CSS Styling ---
+# st.markdown("""
+# <style>
+# body {
+#     background-color: black;
+#     margin: 0;
+#     padding: 0;
+# }
+# .main { 
+#     background-color: black; 
+# }
+# .stApp { 
+#     background-color: black; 
+# }
+# .header {
+#     color: #00ff99;
+#     border-bottom: 1px solid #00ff99;
+#     padding: 10px 20px;
+#     margin-bottom: 10px;
+#     font-family: monospace;
+#     font-size: 14px;
+#     background-color: #000;
+# }
+# </style>
+# """, unsafe_allow_html=True)
 
-Web Development:
-• Streamlit, React, Node.js
-• Flask, FastAPI
-• HTML/CSS, Tailwind
 
-Databases & Tools:
-• ChromaDB, MySQL, PostgreSQL
-• Docker, Git, GitHub
-• Cloud Platforms (AWS, GCP)""",
-    
-    "projects": """Featured Projects:
+# # --- Terminal Header ---
+# st.markdown(
+#     '<div class="header">help | about | projects | skills | experience | contact | education | clear</div>',
+#     unsafe_allow_html=True
+# )
 
-1. AI-Powered Terminal Portfolio (Current)
-   • Interactive terminal-style portfolio with RAG integration
-   • Technologies: Streamlit, Python, ChromaDB, LangChain
-   • Features: Real-time AI responses, resume querying
-   
-2. HR Chatbot with RAG
-   • Intelligent chatbot for HR queries using retrieval-augmented generation
-   • Technologies: LangChain, Streamlit, OpenAI
-   • Handles employee queries with context-aware responses
-   
-3. Expense Tracker Application
-   • Full-stack expense management system
-   • Technologies: React, Node.js, MySQL
-   • Features: Budget tracking, analytics, reporting
-   
-4. Django E-commerce Site
-   • Complete e-commerce platform
-   • Technologies: Django, PostgreSQL, Stripe
-   • Features: Product management, payment processing, user authentication""",
-    
-    "experience": """Work Experience:
 
-AI Engineer & Software Developer
-Freelance/Contract | 2023 - Present
-• Developing AI-powered applications using LangChain and RAG
-• Building scalable backend systems with Python and FastAPI
-• Implementing machine learning solutions for clients
-• Creating intelligent chatbots and automation tools
+# # --- Generate the HTML for the terminal ---
+# def create_terminal_html():
+#     history_json = json.dumps(st.session_state.history)
+#     command_count = st.session_state.command_count
+#     now = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
 
-Software Developer
-[Previous Company] | 2021 - 2023
-• Developed full-stack web applications using React and Node.js
-• Implemented RESTful APIs and database design
-• Collaborated with cross-functional teams on product development
-• Optimized application performance and user experience
+#     html = f"""
+#     <!DOCTYPE html>
+#     <html>
+#     <head>
+#         <style>
+#             body {{
+#                 background-color: #000;
+#                 font-family: 'Courier New', monospace;
+#                 color: #fff;
+#                 overflow: hidden;
+#                 margin: 0;
+#                 padding: 0;
+#             }}
+#             .terminal {{
+#                 background-color: #000;
+#                 color: #fff;
+#                 font-family: 'Courier New', monospace;
+#                 padding: 20px;
+#                 border: 1px solid #00ff99;
+#                 border-radius: 5px;
+#                 min-height: 500px;
+#                 max-height: 500px;
+#                 overflow-y: auto;
+#                 white-space: pre-wrap;
+#                 word-wrap: break-word;
+#             }}
+#             .prompt {{ color: #00aaff; font-weight: bold; }}
+#             .command {{ color: #00ff99; }}
+#             .output {{ color: #fff; margin-top: 5px; margin-bottom: 15px; line-height: 1.5; }}
+#             .ai-output {{ color: #fff; margin-top: 5px; margin-bottom: 15px; line-height: 1.5; }}
+#             .input-line {{ display: flex; align-items: baseline; }}
+#             #typed-text {{ color: #00ff99; }}
+#             .cursor {{
+#                 display: inline-block;
+#                 background-color: #00ff99;
+#                 width: 8px;
+#                 height: 16px;
+#                 animation: blink 1s step-start infinite;
+#                 margin-left: 2px;
+#                 vertical-align: baseline;
+#             }}
+#             @keyframes blink {{ 50% {{ background-color: transparent; }} }}
+#             .timestamp {{
+#                 color: #00ff99;
+#                 text-align: right;
+#                 font-size: 12px;
+#                 margin-top: 10px;
+#                 padding-right: 20px;
+#             }}
+#         </style>
+#     </head>
+#     <body>
+#         <div class="terminal" id="terminal" tabindex="0">
+#             <div id="history-container"></div>
+#             <div class="input-line" id="input-line">
+#                 <span class="prompt">neema@terminal:~$ </span>
+#                 <span id="typed-text"></span>
+#                 <span class="cursor"></span>
+#             </div>
+#         </div>
+#         <div class="timestamp">{now}</div>
 
-Junior Developer
-[Entry Role] | 2020 - 2021
-• Built responsive web interfaces using modern frameworks
-• Participated in code reviews and agile development
-• Maintained and debugged existing applications
-• Learned best practices in software engineering""",
-    
-    "education": """Education:
+#         <script>
+#             let currentInput = '';
+#             let isTyping = false;
+#             let history = {history_json};
+#             let displayedCount = 0;
+#             let commandCount = {command_count};
+#             let lastSentCommand = '';
 
-Bachelor of Science in Computer Science
-[University Name] | 2016 - 2020
-• Focus: Software Engineering, AI, Data Structures
+#             function escapeHtml(text) {{
+#                 const div = document.createElement('div');
+#                 div.textContent = text;
+#                 return div.innerHTML;
+#             }}
 
-Relevant Coursework:
-• Artificial Intelligence & Machine Learning
-• Data Structures & Algorithms
-• Database Management Systems
-• Software Engineering Principles
-• Web Development
-• Cloud Computing
+#             function typeText(element, text, speed, callback) {{
+#                 let index = 0;
+#                 element.textContent = '';
+#                 function typeChar() {{
+#                     if (index < text.length) {{
+#                         element.textContent += text.charAt(index);
+#                         index++;
+#                         scrollToBottom();
+#                         setTimeout(typeChar, speed);
+#                     }} else {{
+#                         if (callback) callback();
+#                     }}
+#                 }}
+#                 typeChar();
+#             }}
 
-Certifications & Training:
-• AI Engineering Bootcamp
-• LangChain & RAG Development
-• Cloud Architecture (AWS/GCP)
-• Full-Stack Web Development
+#             function scrollToBottom() {{
+#                 const terminal = document.getElementById('terminal');
+#                 terminal.scrollTop = terminal.scrollHeight;
+#             }}
 
-Continuous Learning:
-• Currently exploring: Advanced RAG techniques, LLM fine-tuning
-• Active in AI/ML communities and hackathons
-• Regular contributor to open-source projects""",
-    
-    "contact": """Let's Connect!
+#             function displayHistory() {{
+#                 const container = document.getElementById('history-container');
+#                 if (displayedCount < history.length) {{
+#                     const entry = history[displayedCount];
+#                     displayedCount++;
+#                     const commandDiv = document.createElement('div');
+#                     const promptSpan = document.createElement('span');
+#                     promptSpan.className = 'prompt';
+#                     promptSpan.textContent = entry.prompt;
+#                     const commandSpan = document.createElement('span');
+#                     commandSpan.className = 'command';
+#                     commandSpan.textContent = entry.command;
+#                     commandDiv.appendChild(promptSpan);
+#                     commandDiv.appendChild(commandSpan);
+#                     container.appendChild(commandDiv);
+#                     if (entry.output) {{
+#                         const outputDiv = document.createElement('div');
+#                         outputDiv.className = entry.is_ai ? 'ai-output' : 'output';
+#                         container.appendChild(outputDiv);
+#                         isTyping = true;
+#                         typeText(outputDiv, entry.output, 10, function() {{
+#                             isTyping = false;
+#                             displayHistory();
+#                         }});
+#                     }} else {{
+#                         displayHistory();
+#                     }}
+#                 }}
+#             }}
 
-• Email: neemamwende@gmail.com
-• GitHub: github.com/NeemaMwende
-• LinkedIn: linkedin.com/in/neemamwende
-• Twitter: @neemamwende
-• Location: Nairobi, Kenya
+#             function updateDisplay() {{
+#                 const typedText = document.getElementById('typed-text');
+#                 if (typedText) {{
+#                     typedText.textContent = currentInput;
+#                 }}
+#                 scrollToBottom();
+#             }}
 
-Availability:
-• Open to: Full-time, Contract, Collaboration opportunities
-• Interested in: AI/ML projects, innovative startups, impactful tech
+#             function sendCommand(cmd) {{
+#                 // Prevent sending duplicate commands
+#                 if (cmd === lastSentCommand) {{
+#                     console.log('Duplicate command prevented:', cmd);
+#                     return;
+#                 }}
+#                 lastSentCommand = cmd;
+#                 console.log('Sending command:', cmd);
+#                 window.parent.postMessage({{
+#                     type: 'streamlit:setComponentValue',
+#                     value: cmd
+#                 }}, '*');
+#             }}
 
-Feel free to reach out for collaborations, opportunities, or just to chat about AI and technology!""",
-}
+#             document.addEventListener('keydown', function(e) {{
+#                 if (isTyping) {{
+#                     e.preventDefault();
+#                     return;
+#                 }}
+#                 if (e.key === 'Enter') {{
+#                     e.preventDefault();
+#                     const cmd = currentInput.trim();
+#                     if (cmd !== '') {{
+#                         sendCommand(cmd);
+#                         currentInput = '';
+#                         updateDisplay();
+#                     }}
+#                 }} else if (e.key === 'Backspace') {{
+#                     e.preventDefault();
+#                     currentInput = currentInput.slice(0, -1);
+#                     updateDisplay();
+#                 }} else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {{
+#                     e.preventDefault();
+#                     currentInput += e.key;
+#                     updateDisplay();
+#                 }}
+#             }});
 
-# --- Custom CSS Styling ---
-st.markdown("""
-<style>
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    /* Reset padding */
-    .block-container {
-        padding: 0 !important;
-        max-width: 100% !important;
-    }
-    
-    /* Body styling */
-    .stApp {
-        background-color: #000000;
-    }
-    
-    /* Header navigation */
-    .header {
-        color: #00ff99;
-        border-bottom: 1px solid #00ff99;
-        padding: 15px 30px;
-        margin: 0;
-        font-family: 'Courier New', monospace;
-        font-size: 14px;
-        background-color: #000;
-    }
-    
-    /* Terminal container */
-    .terminal-container {
-        background-color: #000000;
-        border: 2px solid #00ff99;
-        border-radius: 5px;
-        padding: 20px;
-        margin: 20px 30px;
-        font-family: 'Courier New', monospace;
-        min-height: 500px;
-        max-height: 600px;
-        overflow-y: auto;
-        color: #ffffff;
-    }
-    
-    /* Prompt styling */
-    .terminal-prompt {
-        color: #00aaff;
-        font-weight: bold;
-        font-family: 'Courier New', monospace;
-    }
-    
-    /* Command styling */
-    .terminal-command {
-        color: #00ff99;
-        font-family: 'Courier New', monospace;
-    }
-    
-    /* Output styling */
-    .terminal-output {
-        color: #ffffff;
-        font-family: 'Courier New', monospace;
-        white-space: pre-wrap;
-        margin: 10px 0 20px 0;
-        line-height: 1.6;
-    }
-    
-    /* Input field styling */
-    .stTextInput > div > div > input {
-        background-color: #000000 !important;
-        color: #00ff99 !important;
-        border: none !important;
-        font-family: 'Courier New', monospace !important;
-        font-size: 14px !important;
-        padding: 0 !important;
-        box-shadow: none !important;
-    }
-    
-    .stTextInput > div > div > input:focus {
-        box-shadow: none !important;
-        border: none !important;
-    }
-    
-    .stTextInput > label {
-        display: none !important;
-    }
-    
-    /* Hide input container borders */
-    .stTextInput > div {
-        border: none !important;
-        padding: 0 !important;
-    }
-    
-    /* Timestamp */
-    .timestamp {
-        color: #00ff99;
-        text-align: right;
-        font-size: 12px;
-        font-family: 'Courier New', monospace;
-        padding-right: 30px;
-        margin-top: 10px;
-    }
-    
-    /* Scrollbar styling */
-    .terminal-container::-webkit-scrollbar {
-        width: 10px;
-    }
-    
-    .terminal-container::-webkit-scrollbar-track {
-        background: #000000;
-    }
-    
-    .terminal-container::-webkit-scrollbar-thumb {
-        background: #00ff99;
-        border-radius: 5px;
-    }
-    
-    .terminal-container::-webkit-scrollbar-thumb:hover {
-        background: #00cc77;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --- Process Command ---
-def process_command(cmd):
-    """Process user command and return response"""
-    cmd = cmd.strip().lower()
-    
-    if cmd == "clear":
-        # Clear history except welcome
-        welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
-
-Welcome to my interactive terminal!
-Type 'help' to see available commands.
-
-Type any command to continue..."""
-        st.session_state.history = [
-            {"command": "welcome", "output": welcome_text, "timestamp": datetime.now()}
-        ]
-        return None
-    
-    if cmd == "":
-        return ""
-    
-    # If RAG engine is available, use it
-    if rag_engine:
-        try:
-            # Check for static responses first
-            static_response = rag_engine.get_static_response(cmd)
+#             const terminal = document.getElementById('terminal');
+#             terminal.focus();
+#             terminal.addEventListener('blur', function() {{
+#                 if (!isTyping) {{
+#                     setTimeout(() => terminal.focus(), 10);
+#                 }}
+#             }});
             
-            if static_response:
-                return static_response
-            else:
-                # Use RAG for other queries
-                return rag_engine.query(cmd)
-        except Exception as e:
-            return f"Error processing command: {str(e)}"
-    else:
-        # Use fallback responses
-        if cmd in FALLBACK_RESPONSES:
-            return FALLBACK_RESPONSES[cmd]
-        else:
-            # Try to answer as an AI question
-            return f"Command '{cmd}' not recognized. Type 'help' to see available commands.\n\n(Note: RAG engine not loaded. This terminal is running in standalone mode with fallback responses.)"
+#             // Initialize display
+#             displayHistory();
+#             updateDisplay();
+#             console.log('Terminal initialized with', history.length, 'history entries');
+#         </script>
+#     </body>
+#     </html>
+#     """
+#     return html
 
-# --- Header Navigation ---
-st.markdown(
-    '<div class="header">help | about | projects | skills | experience | contact | education | clear</div>',
-    unsafe_allow_html=True
-)
 
-# --- Terminal Display ---
-st.markdown('<div class="terminal-container">', unsafe_allow_html=True)
+# # --- Render the Terminal ---
+# terminal_html = create_terminal_html()
+# command_received = components.html(terminal_html, height=650, scrolling=False)
 
-# Display command history
-for entry in st.session_state.history:
-    if entry["command"] != "welcome":
-        st.markdown(
-            f'<div><span class="terminal-prompt">neema@terminal:~$ </span>'
-            f'<span class="terminal-command">{entry["command"]}</span></div>',
-            unsafe_allow_html=True
-        )
-    
-    if entry["output"]:
-        st.markdown(
-            f'<div class="terminal-output">{entry["output"]}</div>',
-            unsafe_allow_html=True
-        )
 
-# Input prompt and field
-col1, col2 = st.columns([0.25, 9.75])
+# # --- Command Processing with RAG Integration ---
+# if command_received and isinstance(command_received, str) and command_received.strip():
+#     cmd = command_received.strip()
 
-with col1:
-    st.markdown('<span class="terminal-prompt">neema@terminal:~$ </span>', unsafe_allow_html=True)
+#     # Avoid reprocessing same command
+#     if cmd != st.session_state.current_input and not st.session_state.processing:
+#         st.session_state.processing = True
+#         st.session_state.current_input = cmd
+#         st.session_state.command_count += 1
 
-with col2:
-    # Use a form to handle Enter key properly
-    with st.form(key=f"input_form_{st.session_state.input_key}", clear_on_submit=True):
-        user_input = st.text_input(
-            "command",
-            key=f"user_input_{st.session_state.input_key}",
-            label_visibility="collapsed",
-            placeholder=""
-        )
+#         if cmd.lower() == "clear":
+#             welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
+
+# Welcome to my interactive terminal!
+# Type 'help' to see available commands.
+
+# Type any command to continue..."""
+#             st.session_state.history = [
+#                 {"prompt": "neema@terminal:~$ ", "command": "", "output": welcome_text, "is_ai": False}
+#             ]
+#         else:
+#             # Check if RAG engine is available
+#             if rag_engine:
+#                 try:
+#                     # Check for static responses first
+#                     static_response = rag_engine.get_static_response(cmd)
+                    
+#                     if static_response:
+#                         response = static_response
+#                         is_ai = False
+#                     else:
+#                         # Use RAG for other queries
+#                         response = rag_engine.query(cmd)
+#                         is_ai = True
+#                 except Exception as e:
+#                     response = f"Error processing command: {str(e)}"
+#                     is_ai = False
+#             else:
+#                 # Fallback to simulated responses if RAG fails
+#                 responses = {
+#                     "help": """Available commands:
+# • about - Learn about me
+# • skills - View my technical skills
+# • projects - See my projects
+# • experience - View my work experience
+# • education - See my education background
+# • contact - Get my contact information
+# • clear - Clear terminal
+# • Or ask any question about my background!""",
+#                     "about": "I'm Neema Mwende, a passionate AI Engineer & Software Developer from Nairobi.",
+#                     "skills": """Technical Skills:
+# • Languages: Python, JavaScript
+# • Frameworks: React, Node.js, Streamlit
+# • AI/ML: LangChain, RAG, Google Gemini
+# • Tools: Docker, MySQL, Git""",
+#                     "projects": """Projects:
+# • HR Chatbot (RAG + Streamlit)
+# • Portfolio Terminal
+# • Expense Tracker App
+# • Django E-commerce Site""",
+#                     "contact": """Contact Information:
+# • Email: neemamwende@gmail.com
+# • GitHub: github.com/NeemaMwende
+# • LinkedIn: linkedin.com/in/neemamwende""",
+#                     "experience": "Please add your experience details to this fallback response.",
+#                     "education": "Please add your education details to this fallback response."
+#                 }
+#                 response = responses.get(cmd.lower(), f"Command '{cmd}' not found. Type 'help' for options.")
+#                 is_ai = False
+
+#             st.session_state.history.append({
+#                 "prompt": "neema@terminal:~$ ",
+#                 "command": cmd,
+#                 "output": response,
+#                 "is_ai": is_ai
+#             })
         
-        # Hidden submit button (triggered by Enter key)
-        submitted = st.form_submit_button("Submit", use_container_width=False)
-        
-        if submitted and user_input:
-            # Process the command
-            response = process_command(user_input)
-            
-            # Add to history if not clear command
-            if response is not None:
-                st.session_state.history.append({
-                    "command": user_input,
-                    "output": response,
-                    "timestamp": datetime.now()
-                })
-            
-            # Increment key to reset form
-            st.session_state.input_key += 1
-            st.rerun()
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# --- Timestamp ---
-current_time = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
-st.markdown(f'<div class="timestamp">{current_time}</div>', unsafe_allow_html=True)
-
-# Auto-focus JavaScript (attempts to keep focus on input)
-st.markdown("""
-<script>
-    // Try to focus on the input field
-    setTimeout(function() {
-        const inputs = window.parent.document.querySelectorAll('input[type="text"]');
-        if (inputs.length > 0) {
-            inputs[inputs.length - 1].focus();
-        }
-    }, 100);
-</script>
-""", unsafe_allow_html=True)
+#         st.session_state.processing = False
+#         time.sleep(0.1)  # Brief pause to ensure state is saved
+#         st.rerun()
