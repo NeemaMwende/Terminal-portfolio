@@ -37,12 +37,22 @@ st.set_page_config(page_title="Neema Mwende - AI Terminal", layout="wide", initi
 # rag_engine = load_rag_engine()
 rag_engine = None  # Set to None for standalone mode
 
+def simulate_typing_effect(text: str, delay: float = 0.02):
+    """Simulate typing animation for output text"""
+    placeholder = st.empty()
+    typed_text = ""
+    for char in text:
+        typed_text += char
+        placeholder.markdown(
+            f'<div class="terminal-output">{typed_text}</div>',
+            unsafe_allow_html=True
+        )
+        time.sleep(delay)
+
 # --- Initialize session state ---
 if "history" not in st.session_state:
     welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
-
-Welcome to my interactive terminal!
-Type 'help' to see available commands.
+Welcome to my interactive terminal! Type 'help' to see available commands.
 
 Type any command to continue..."""
     st.session_state.history = [
@@ -54,6 +64,9 @@ if "current_input" not in st.session_state:
 
 if "input_key" not in st.session_state:
     st.session_state.input_key = 0
+
+if "typing_complete" not in st.session_state:
+    st.session_state.typing_complete = False
 
 # --- Fallback responses (will be replaced by RAG) ---
 FALLBACK_RESPONSES = {
@@ -210,28 +223,13 @@ st.markdown("""
         background-color: #000;
     }
     
-    /* Terminal container - FIXED */
-    # .terminal-container {
-    #     background-color: #000000;
-    #     border: 2px solid #00ff99;
-    #     border-radius: 5px;
-    #     padding: 20px;
-    #     margin: 20px 30px;
-    #     font-family: 'Courier New', monospace;
-    #     min-height: 70vh;
-    #     max-height: 70vh;
-    #     overflow-y: auto;
-    #     color: #ffffff;
-    #     position: relative;
-    # }
-    
-    # /* Prompt styling */
-    # .terminal-prompt {
-    #     color: blue;
-    #     font-weight: bold;
-    #     font-family: 'Courier New', monospace;
-    #     display: inline;
-    # }
+    /* Prompt styling - ALWAYS BLUE */
+    .terminal-prompt {
+        color: blue !important;
+        font-weight: bold;
+        font-family: 'Courier New', monospace;
+        display: inline;
+    }
     
     /* Command styling */
     .terminal-command {
@@ -245,8 +243,8 @@ st.markdown("""
         color: #ffffff;
         font-family: 'Courier New', monospace;
         white-space: pre-wrap;
-        margin: 10px 0 20px 0;
-        line-height: 1.6;
+        margin: 5px 0 15px 0;
+        line-height: 1.5;
     }
     
     /* Input wrapper - keep inside terminal */
@@ -257,11 +255,26 @@ st.markdown("""
     }
     
     .input-prompt {
-        color: #00aaff;
+        color: blue !important;
         font-weight: bold;
         font-family: 'Courier New', monospace;
         margin-right: 5px;
         flex-shrink: 0;
+    }
+    
+    /* Blinking cursor */
+    .blinking-cursor {
+        color: #00ff99;
+        font-weight: bold;
+        animation: blink 1s infinite;
+        font-family: 'Courier New', monospace;
+        display: inline-block;
+        margin-left: 2px;
+    }
+    
+    @keyframes blink {
+        0%, 49% { opacity: 1; }
+        50%, 100% { opacity: 0; }
     }
     
     /* Input field styling */
@@ -316,24 +329,6 @@ st.markdown("""
         margin-top: 10px;
     }
     
-    # /* Scrollbar styling */
-    # .terminal-container::-webkit-scrollbar {
-    #     width: 10px;
-    # }
-    
-    # .terminal-container::-webkit-scrollbar-track {
-    #     background: #000000;
-    # }
-    
-    # .terminal-container::-webkit-scrollbar-thumb {
-    #     background: #00ff99;
-    #     border-radius: 5px;
-    # }
-    
-    # .terminal-container::-webkit-scrollbar-thumb:hover {
-    #     background: #00cc77;
-    # }
-    
     /* Fix for Streamlit columns inside terminal */
     [data-testid="column"] {
         padding: 0 !important;
@@ -349,14 +344,13 @@ def process_command(cmd):
     if cmd == "clear":
         # Clear history except welcome
         welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
-
-Welcome to my interactive terminal!
-Type 'help' to see available commands.
+Welcome to my interactive terminal! Type 'help' to see available commands.
 
 Type any command to continue..."""
         st.session_state.history = [
             {"command": "welcome", "output": welcome_text, "timestamp": datetime.now()}
         ]
+        st.session_state.typing_complete = False
         return None
     
     if cmd == "":
@@ -388,29 +382,35 @@ st.markdown(
     '<div class="header">help | about | projects | skills | experience | contact | education | clear</div>',
     unsafe_allow_html=True
 )
-# --- Create Terminal Container with all content inside ---
-# st.markdown('<div class="terminal-container">', unsafe_allow_html=True)
 
-# Display command history
-for entry in st.session_state.history:
-    if entry["command"] != "welcome":
-        st.markdown(
-            f'<div><span class="terminal-prompt">neema@terminal:~$ </span>'
-            f'<span class="terminal-command">{entry["command"]}</span></div>',
-            unsafe_allow_html=True
-        )
+# --- Display command history ---
+for i, entry in enumerate(st.session_state.history):
+    # Always show the prompt with command
+    st.markdown(
+        f'<div><span class="terminal-prompt">neema@terminal:~$ </span>'
+        f'<span class="terminal-command">{entry["command"]}</span></div>',
+        unsafe_allow_html=True
+    )
 
     if entry["output"]:
         output_escaped = (
-            entry["output"].replace("&", "&amp;")
+            entry["output"]
+            .replace("&", "&amp;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
         )
-        st.markdown(f'<div class="terminal-output">{output_escaped}</div>', unsafe_allow_html=True)
 
-# --- Input Section now inside the terminal box ---
+        # Animate typing only for the last (most recent) output and only once
+        if i == len(st.session_state.history) - 1 and not st.session_state.typing_complete:
+            simulate_typing_effect(output_escaped)
+            st.session_state.typing_complete = True
+        else:
+            # Instantly render previous outputs (no animation)
+            st.markdown(f'<div class="terminal-output">{output_escaped}</div>', unsafe_allow_html=True)
+
+# --- Input Section ---
 st.markdown('<div class="input-wrapper">', unsafe_allow_html=True)
-st.markdown('<span class="input-prompt">neema@terminal:~$ </span>', unsafe_allow_html=True)
+st.markdown('<span class="input-prompt">neema@terminal:~$ </span><span class="blinking-cursor">█</span>', unsafe_allow_html=True)
 
 with st.form(key=f"input_form_{st.session_state.input_key}", clear_on_submit=True):
     user_input = st.text_input(
@@ -430,11 +430,10 @@ with st.form(key=f"input_form_{st.session_state.input_key}", clear_on_submit=Tru
                 "timestamp": datetime.now()
             })
         st.session_state.input_key += 1
+        st.session_state.typing_complete = False  # Reset for next command
         st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)  # close input-wrapper
-st.markdown('</div>', unsafe_allow_html=True)  # close terminal-container
-
 
 # --- Timestamp ---
 current_time = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
