@@ -210,7 +210,7 @@ st.markdown("""
         background-color: #000;
     }
     
-    /* Terminal container */
+    /* Terminal container - FIXED */
     .terminal-container {
         background-color: #000000;
         border: 2px solid #00ff99;
@@ -218,10 +218,11 @@ st.markdown("""
         padding: 20px;
         margin: 20px 30px;
         font-family: 'Courier New', monospace;
-        min-height: 500px;
-        max-height: 600px;
+        min-height: 70vh;
+        max-height: 70vh;
         overflow-y: auto;
         color: #ffffff;
+        position: relative;
     }
     
     /* Prompt styling */
@@ -229,12 +230,14 @@ st.markdown("""
         color: #00aaff;
         font-weight: bold;
         font-family: 'Courier New', monospace;
+        display: inline;
     }
     
     /* Command styling */
     .terminal-command {
         color: #00ff99;
         font-family: 'Courier New', monospace;
+        display: inline;
     }
     
     /* Output styling */
@@ -246,7 +249,26 @@ st.markdown("""
         line-height: 1.6;
     }
     
+    /* Input wrapper - keep inside terminal */
+    .input-wrapper {
+        display: flex;
+        align-items: flex-start;
+        margin-top: 10px;
+    }
+    
+    .input-prompt {
+        color: #00aaff;
+        font-weight: bold;
+        font-family: 'Courier New', monospace;
+        margin-right: 5px;
+        flex-shrink: 0;
+    }
+    
     /* Input field styling */
+    .stTextInput {
+        flex-grow: 1;
+    }
+    
     .stTextInput > div > div > input {
         background-color: #000000 !important;
         color: #00ff99 !important;
@@ -255,6 +277,7 @@ st.markdown("""
         font-size: 14px !important;
         padding: 0 !important;
         box-shadow: none !important;
+        height: auto !important;
     }
     
     .stTextInput > div > div > input:focus {
@@ -268,6 +291,17 @@ st.markdown("""
     
     /* Hide input container borders */
     .stTextInput > div {
+        border: none !important;
+        padding: 0 !important;
+    }
+    
+    /* Hide submit button but keep it functional */
+    .stButton button {
+        display: none !important;
+    }
+    
+    /* Form styling */
+    .stForm {
         border: none !important;
         padding: 0 !important;
     }
@@ -298,6 +332,11 @@ st.markdown("""
     
     .terminal-container::-webkit-scrollbar-thumb:hover {
         background: #00cc77;
+    }
+    
+    /* Fix for Streamlit columns inside terminal */
+    [data-testid="column"] {
+        padding: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -350,29 +389,31 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- Terminal Display ---
-st.markdown('<div class="terminal-container">', unsafe_allow_html=True)
+# --- Create Terminal Container with all content inside ---
+terminal_html = '<div class="terminal-container">'
 
 # Display command history
 for entry in st.session_state.history:
     if entry["command"] != "welcome":
-        st.markdown(
-            f'<div><span class="terminal-prompt">neema@terminal:~$ </span>'
-            f'<span class="terminal-command">{entry["command"]}</span></div>',
-            unsafe_allow_html=True
-        )
+        terminal_html += f'<div><span class="terminal-prompt">neema@terminal:~$ </span><span class="terminal-command">{entry["command"]}</span></div>'
     
     if entry["output"]:
-        st.markdown(
-            f'<div class="terminal-output">{entry["output"]}</div>',
-            unsafe_allow_html=True
-        )
+        # Escape HTML in output
+        output_escaped = entry["output"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        terminal_html += f'<div class="terminal-output">{output_escaped}</div>'
 
-# Input prompt and field
-col1, col2 = st.columns([0.25, 9.75])
+terminal_html += '</div>'
+
+# Display the terminal with history
+st.markdown(terminal_html, unsafe_allow_html=True)
+
+# --- Input Section (separate from terminal container but styled to look inside) ---
+st.markdown('<div style="margin: 0 30px; margin-top: -50px; position: relative; z-index: 10;">', unsafe_allow_html=True)
+
+col1, col2 = st.columns([0.15, 0.85])
 
 with col1:
-    st.markdown('<span class="terminal-prompt">neema@terminal:~$ </span>', unsafe_allow_html=True)
+    st.markdown('<div class="input-prompt">neema@terminal:~$ </div>', unsafe_allow_html=True)
 
 with col2:
     # Use a form to handle Enter key properly
@@ -385,7 +426,7 @@ with col2:
         )
         
         # Hidden submit button (triggered by Enter key)
-        submitted = st.form_submit_button("Submit", use_container_width=False)
+        submitted = st.form_submit_button("Submit")
         
         if submitted and user_input:
             # Process the command
@@ -408,16 +449,3 @@ st.markdown('</div>', unsafe_allow_html=True)
 # --- Timestamp ---
 current_time = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
 st.markdown(f'<div class="timestamp">{current_time}</div>', unsafe_allow_html=True)
-
-# Auto-focus JavaScript (attempts to keep focus on input)
-st.markdown("""
-<script>
-    // Try to focus on the input field
-    setTimeout(function() {
-        const inputs = window.parent.document.querySelectorAll('input[type="text"]');
-        if (inputs.length > 0) {
-            inputs[inputs.length - 1].focus();
-        }
-    }, 100);
-</script>
-""", unsafe_allow_html=True)
