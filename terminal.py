@@ -280,6 +280,7 @@ st.markdown("""
     /* Input field styling */
     .stTextInput {
         flex-grow: 1;
+        display: inline-block;
     }
     
     .stTextInput > div > div > input {
@@ -291,6 +292,7 @@ st.markdown("""
         padding: 0 !important;
         box-shadow: none !important;
         height: auto !important;
+        line-height: 1.5 !important;
     }
     
     .stTextInput > div > div > input:focus {
@@ -344,7 +346,7 @@ def process_command(cmd):
     if cmd == "clear":
         # Clear history except welcome
         welcome_text = """Hi, I'm Neema Mwende, a Software & AI Engineer.
-Welcome to my interactive terminal! Type 'help' to see available commands.
+Welcome to my interactive terminal! /nType 'help' to see available commands./n/n
 
 Type any command to continue..."""
         st.session_state.history = [
