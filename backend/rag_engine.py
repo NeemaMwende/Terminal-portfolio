@@ -1,131 +1,118 @@
-import chromadb
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import Chroma
-from langchain.chains import RetrievalQA
-from langchain.llms.base import LLM
-from typing import Optional, List
+"""
+RAG Engine for Resume-based Q&A with Gemini
+"""
 import os
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_community.vectorstores import Chroma
+from langchain_core.prompts import PromptTemplate
+from langchain.chains.retrieval_qa.base import RetrievalQA
 
-class SimpleRAG:
-    def __init__(self, resume_path="data/resume.txt"):
-        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+class ResumeRAG:
+    def __init__(self, resume_path, gemini_api_key):
         self.resume_path = resume_path
+        os.environ["GOOGLE_API_KEY"] = gemini_api_key
         self.vectorstore = None
-        self.setup()
+        self.qa_chain = None
+        self._setup_rag()
     
-    def setup(self):
-        # Load resume
-        if not os.path.exists(self.resume_path):
-            # Create sample resume if doesn't exist
-            os.makedirs("data", exist_ok=True)
-            with open(self.resume_path, "w") as f:
-                f.write(self._get_sample_resume())
-        
-        with open(self.resume_path, "r") as f:
-            text = f.read()
+    def _setup_rag(self):
+        # Load PDF
+        loader = PyPDFLoader(self.resume_path)
+        documents = loader.load()
         
         # Split text
-        splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        chunks = splitter.split_text(text)
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=100
+        )
+        splits = text_splitter.split_documents(documents)
         
-        # Create vectorstore
-        self.vectorstore = Chroma.from_texts(
-            texts=chunks,
-            embedding=self.embeddings,
-            collection_name="resume"
+        # Create embeddings with Gemini
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        self.vectorstore = Chroma.from_documents(
+            documents=splits,
+            embedding=embeddings
+        )
+        
+        # Create LLM with Gemini
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
+        
+        # Custom prompt
+        prompt_template = """You are answering as the person in the resume. Use FIRST PERSON (I, my, me).
+
+RULES:
+1. Answer in first person
+2. Use bullet points with • symbol
+3. Keep responses SHORT and concise
+4. ONLY use information from the context
+5. If not in context, say "That information is not in my resume."
+
+Context: {context}
+
+Question: {question}
+
+Answer:"""
+        
+        PROMPT = PromptTemplate(
+            template=prompt_template,
+            input_variables=["context", "question"]
+        )
+        
+        self.qa_chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=self.vectorstore.as_retriever(search_kwargs={"k": 3}),
+            chain_type_kwargs={"prompt": PROMPT},
+            return_source_documents=False
         )
     
-    def query(self, command: str) -> str:
-        # Map commands to queries
-        command_map = {
-            "about": "Tell me about Mark Gatere, his background and who he is",
-            "projects": "List all projects Mark has worked on with descriptions",
-            "skills": "What are Mark's technical skills and technologies he knows?",
-            "experience": "Describe Mark's work experience and job history",
-            "contact": "How can I contact Mark? Provide contact information",
-            "education": "What is Mark's educational background?",
-            "certifications": "What certifications does Mark have?",
-            "leadership": "Describe Mark's leadership experience and community involvement"
-        }
-        
-        query_text = command_map.get(command.lower(), command)
-        
-        # Retrieve relevant context
-        docs = self.vectorstore.similarity_search(query_text, k=3)
-        context = "\n\n".join([doc.page_content for doc in docs])
-        
-        # Simple response generation
-        return self._generate_response(command, context)
+    def query(self, question):
+        if not self.qa_chain:
+            return "RAG engine not initialized."
+        try:
+            result = self.qa_chain.invoke({"query": question})
+            return result["result"]
+        except Exception as e:
+            return f"Error: {str(e)}"
     
-    def _generate_response(self, command: str, context: str) -> str:
-        # Simple rule-based responses with context
-        responses = {
-            "about": f"Based on my resume:\n\n{context[:500]}",
-            "projects": f"Here are my key projects:\n\n{context[:600]}",
-            "skills": f"My technical skills include:\n\n{context[:500]}",
-            "experience": f"My work experience:\n\n{context[:600]}",
-            "contact": f"Contact information:\n\n{context[:400]}",
-            "education": f"Educational background:\n\n{context[:500]}",
-            "certifications": f"Certifications:\n\n{context[:500]}",
-            "leadership": f"Leadership & community involvement:\n\n{context[:500]}"
+    def get_static_response(self, command):
+        static = {
+            "help": """Available commands:
+• about       - Learn about me
+• projects    - View my projects
+• skills      - See my technical skills
+• experience  - My work experience
+• contact     - How to reach me
+• education   - My educational background
+• certifications - View my certifications
+• leadership  - Leadership and community involvement
+• clear       - Clear the terminal
+
+Type any command to continue..""",
         }
-        
-        return responses.get(command.lower(), context[:500])
+        return static.get(command.lower(), None)
+
+
+# Test independently
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     
-    def _get_sample_resume(self) -> str:
-        return """
-MARK GATERE
-Software & AI Engineer
-Email: mark.gatere@example.com | Phone: +254 700 123456
-LinkedIn: linkedin.com/in/markgatere | GitHub: github.com/markgatere
-
-ABOUT ME
-Passionate Software & AI Engineer with 5+ years of experience building scalable applications and AI-powered solutions. 
-Specialized in full-stack development, machine learning, and cloud architecture. Strong advocate for clean code and user-centric design.
-
-TECHNICAL SKILLS
-Languages: Python, JavaScript, TypeScript, Java, SQL
-Frontend: React, Next.js, Vue.js, Tailwind CSS, Material-UI
-Backend: Node.js, Django, Flask, FastAPI, Express
-AI/ML: TensorFlow, PyTorch, LangChain, Hugging Face, OpenAI
-Databases: PostgreSQL, MongoDB, Redis, ChromaDB
-Cloud: AWS, Google Cloud, Docker, Kubernetes
-
-WORK EXPERIENCE
-
-Senior Software Engineer | TechCorp Inc. | 2021 - Present
-- Led development of AI-powered customer service platform using LangChain and GPT-4
-- Architected microservices handling 1M+ daily requests with 99.9% uptime
-- Mentored team of 5 junior developers in modern development practices
-
-Full Stack Developer | StartupXYZ | 2019 - 2021
-- Built responsive web applications using React and Node.js
-- Implemented RESTful APIs serving 50K+ active users
-- Reduced page load times by 40% through optimization
-
-PROJECTS
-
-AI Chat Assistant
-Full-stack chatbot using LangChain, ChromaDB, and React. Implements RAG for context-aware responses.
-Tech: Python, React, LangChain, Vector DB
-
-E-Commerce Platform
-Scalable online marketplace with payment integration and real-time inventory management.
-Tech: Next.js, PostgreSQL, Stripe API
-
-EDUCATION
-Bachelor of Science in Computer Science | University of Nairobi | 2015 - 2019
-GPA: 3.8/4.0 | Dean's List
-
-CERTIFICATIONS
-- AWS Certified Solutions Architect
-- Google Cloud Professional Developer
-- Deep Learning Specialization (Coursera)
-
-LEADERSHIP & COMMUNITY
-- Founder, Nairobi AI Developers Meetup (200+ members)
-- Open source contributor to React and Python projects
-- Technical mentor at Code for Kenya
-- Speaker at PyCon Kenya 2023
-"""
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    RESUME_PATH = "resume.pdf"
+    
+    rag = ResumeRAG(RESUME_PATH, GEMINI_API_KEY)
+    
+    # Test queries
+    print("Testing RAG Engine...\n")
+    test_queries = ["help", "What are your skills?", "Tell me about your experience"]
+    
+    for q in test_queries:
+        static = rag.get_static_response(q)
+        if static:
+            print(f"Q: {q}\nA: {static}\n")
+        else:
+            print(f"Q: {q}\nA: {rag.query(q)}\n")
