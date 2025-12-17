@@ -102,7 +102,7 @@ if __name__ == "__main__":
     load_dotenv()
     
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-    RESUME_PATH = "resume.pdf"
+    RESUME_PATH = "Resumee.pdf"
     
     rag = ResumeRAG(RESUME_PATH, GEMINI_API_KEY)
     
