@@ -1,7 +1,6 @@
-// components/Terminal.jsx
 "use client";
+
 import { useState, useEffect, useRef } from "react";
-import axios from "axios";
 
 export default function Terminal() {
   const [history, setHistory] = useState([]);
@@ -10,6 +9,145 @@ export default function Terminal() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
   const terminalRef = useRef(null);
+
+  // Fallback responses for each command
+  const fallbackResponses = {
+    welcome: `Hi, I'm Neema Mwende, a Software & AI Engineer.
+
+Welcome to my interactive 'AI powered' portfolio terminal!
+Type 'help' to see available commands.
+
+Type any command to continue..`,
+
+    about: `I'm Neema Mwende, a results-driven Software and AI Engineer with a strong background in JavaScript and Python. I specialize in building efficient, scalable, and intelligent systems.
+
+I'm passionate about integrating artificial intelligence and machine learning into software solutions to enhance automation and user experience. My expertise spans backend development, API integration, and data-driven problem-solving.
+
+My vision is to leverage AI to create accessible and impactful technologies for real-world challenges.
+`,
+
+    projects: `Here are some of my notable projects:
+
+🔹 AI-Powered Portfolio Terminal
+   An interactive terminal-style portfolio with RAG integration
+   Tech: Next.js, Python, AI/ML
+
+🔹 CodeGenuis
+   an AI-powered tool that analyzes, documents, and visualizes your entire codebase in real time. It provides insights, function summaries, and architecture graphs.
+   Tech: Jac, Python, Streamlit, Langchain
+
+🔹 HR-Powered Chatbot
+   An AI-powered HR Chatbot built with Streamlit, LangChain, ChromaDB, and OpenAI Embeddings. Uses a RAG pipeline to answer HR-related questions from uploaded HR documents, offering intelligent contexts.
+   Tech: Python, Streamlit, Chroma, Langchain
+
+🔹 MCP-Chatbot 
+   AI-powered multimodal chatbot that understands documents, images, and videos. Built with Jac Language, featuring Object Spatial Programming, MCP tools, RAG with ChromaDB, and OpenAI vision.
+   Tech: Jac, Streamlit 
+
+Visit my GitHub for more projects and code samples!`,
+
+    skills: `Technical Skills:
+
+Frontend Development:
+• JavaScript (React.js, Next.js, Node.js, TypeScript)
+• HTML5, CSS3
+• Responsive Web Design
+
+Backend Development:
+• Python (Django)
+• Express.js, Node.js
+• API Development & Integration
+
+AI & Machine Learning:
+• Langchain, RAG (Retrieval-Augmented Generation), HuggingFace
+• PyTorch, NumPy, Pandas, Matplotlib
+• n8n (Automation)
+• Vector Databases (Chroma, Pinecone, FAISS)
+
+DevOps & Tools:
+• Git, GitHub
+• Docker
+• Linux
+• CI/CD Pipelines (GitHub Actions)
+• MySQL
+
+Other:
+• Markdown
+• Data-driven problem solving`,
+
+    experience: `Professional Experience:
+
+🏢 CrowdDoing - Software Developer Intern
+   June 2025 - December 2025
+   • Built and improved web application features using Python
+   • Supported content creation and enhanced overall functionality
+
+🏢 Bitter Brains - Software Developer Intern
+   January 2025 - April 2025
+   • Developed markdown editor for generating Q&A content
+   • Enhanced content automation and web app functionality
+   • Tech: Next.js, Markdown, Python
+
+🏢 ZapTech - Frontend Developer Intern
+   October 2024 - December 2024
+   • Developed server-side rendered web apps using Next.js
+   • Enhanced performance through efficient routing and dynamic content
+
+🏢 Glitex Solutions Limited - Software Developer Intern
+   January 2022 - April 2022
+   • Built responsive React-based user interfaces
+   • Implemented reusable components and state management`,
+
+    contact: `Let's Connect!
+
+📧 Email: neemamwende009@gmail.com
+📱 Phone: 0792366778
+💻 GitHub: github.com/neemamwende
+
+I'm always open to discussing new opportunities, collaborations, or interesting projects. Feel free to reach out!`,
+
+    education: `Education:
+
+🎓 Bachelor of Applied Computer Science
+   Chuka University
+   2019 - 2023
+
+📚 Kenya Certificate of Secondary Education
+   St. Anne's Girls High School
+   2014 - 2018
+
+📚 Kenya Certificate of Primary Education
+   Nguutani Junior Academy
+   2004 - 2013`,
+
+    references: `References:
+
+References Available:
+
+👨‍💼 Peter Njenga
+   CEO, Glitex Solutions Limited
+   📧 peter@glitexsolutions.co.ke
+   📱 0707021821
+
+👨‍🏫 Muhia Mureithi Njeru
+   Teacher, St. Anne's Girls High School
+   📧 matonjeru139@gmail.com
+   📱 0714995319`,
+
+    help: `Available Commands:
+
+• about         - Learn more about me
+• projects      - View my projects
+• skills        - See my technical skills
+• experience    - Review my work experience
+• contact       - Get my contact information
+• education     - View my educational background
+• certifications - See certifications and references
+• clear         - Clear the terminal screen
+• help          - Show this help message
+
+Type any command and press Enter to continue.`,
+  };
 
   // Set current time only on client
   useEffect(() => {
@@ -42,23 +180,26 @@ export default function Terminal() {
     // Type the welcome command
     await typeCommand("welcome", 0);
 
-    // Get welcome response from backend
+    // Try to get welcome response from backend, fallback to local
     try {
-      const response = await axios.post("http://localhost:8000/query", {
-        command: "welcome",
+      const response = await fetch("http://localhost:8000/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ command: "welcome" }),
       });
 
-      const { response: output, is_ai } = response.data;
-      await typeText(output, is_ai, 0);
+      if (response.ok) {
+        const data = await response.json();
+        const { response: output, is_ai } = data;
+        await typeText(output, is_ai, 0);
+      } else {
+        throw new Error("Backend response not OK");
+      }
     } catch (error) {
-      // Fallback welcome message if backend is not available
-      const fallbackMessage = `Hi, I'm Neema Mwende, a Software & AI Engineer.
-
-Welcome to my interactive 'AI powered' portfolio terminal!
-Type 'help' to see available commands.
-
-Type any command to continue..`;
-      await typeText(fallbackMessage, false, 0);
+      // Use fallback welcome message
+      await typeText(fallbackResponses.welcome, false, 0);
     }
 
     setIsTyping(false);
@@ -116,24 +257,34 @@ Type any command to continue..`;
     // Type the command
     await typeCommand(cmd, history.length);
 
+    // Try to get response from backend, fallback to local
     try {
-      const response = await axios.post("http://localhost:8000/query", {
-        command: cmd,
+      const response = await fetch("http://localhost:8000/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ command: cmd }),
       });
 
-      const { response: output, is_ai } = response.data;
-
-      // Type the output
-      await typeText(output, is_ai, history.length);
-      setIsTyping(false);
+      if (response.ok) {
+        const data = await response.json();
+        const { response: output, is_ai } = data;
+        await typeText(output, is_ai, history.length);
+      } else {
+        throw new Error("Backend response not OK");
+      }
     } catch (error) {
-      setHistory((prev) => {
-        const newHistory = [...prev];
-        newHistory[newHistory.length - 1].output = `Error: ${error.message}`;
-        return newHistory;
-      });
-      setIsTyping(false);
+      // Use fallback response based on command
+      const cmdLower = cmd.toLowerCase();
+      const fallbackOutput =
+        fallbackResponses[cmdLower] ||
+        `Command '${cmd}' not recognized. Type 'help' to see available commands.`;
+
+      await typeText(fallbackOutput, false, history.length);
     }
+
+    setIsTyping(false);
   };
 
   const typeCommand = (cmd, historyIndex) => {
@@ -194,7 +345,7 @@ Type any command to continue..`;
     "experience",
     "contact",
     "education",
-    "certifications",
+    "references",
   ];
 
   return (
@@ -249,7 +400,7 @@ Type any command to continue..`;
         </div>
 
         {currentTime && (
-          <div className="text-[#00ff99] text-right text-xs mt-3">
+          <div className="text-[#00ff99] font-bold text-right text-xs mt-3">
             {currentTime}
           </div>
         )}
