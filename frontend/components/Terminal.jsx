@@ -349,9 +349,9 @@ Type any command and press Enter to continue.`,
   ];
 
   return (
-    <div className="min-h-screen p-15 w-350 font-mono text-white">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-black border-4 border-[#00ff99] rounded-md overflow-hidden shadow-lg shadow-[#00ff99]/20">
+    <div className="min-h-screen flex items-center justify-center font-mono text-white p-4">
+      <div className="w-full max-w-4xl">
+        <div className="bg-black border-4 border-[#00ff99] rounded-md overflow-hidden shadow-lg shadow-[#00ff99]/20 h-[500px] w-[900px] flex flex-col">
           {/* Command Header */}
           <div className="bg-[#001a0f] border-b-2 border-[#00ff99] p-3">
             <div className="flex items-center justify-between gap-2 text-[#00ff99] text-sm">
@@ -369,7 +369,7 @@ Type any command and press Enter to continue.`,
           {/* Terminal Content */}
           <div
             ref={terminalRef}
-            className="p-5 min-h-[500px] max-h-[600px] overflow-y-auto whitespace-pre-wrap break-words scrollbar-thin scrollbar-thumb-[#00ff99] scrollbar-track-black"
+            className="pt-5 pb-5 pr-5 pl-7 flex-1 overflow-y-auto whitespace-pre-wrap break-words scrollbar-thin scrollbar-thumb-[#00ff99] scrollbar-track-black"
           >
             {history.map((entry, idx) => (
               <div key={idx}>
@@ -400,7 +400,7 @@ Type any command and press Enter to continue.`,
         </div>
 
         {currentTime && (
-          <div className="text-[#00ff99] font-bold text-right text-xs mt-3">
+          <div className="text-[#00aaff] font-bold text-right text-xs mt-3">
             {currentTime}
           </div>
         )}
